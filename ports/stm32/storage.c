@@ -55,7 +55,8 @@ void storage_init(void) {
         #endif
 
         // Enable the flash IRQ, which is used to also call our storage IRQ handler
-        // It must go at the same priority as USB (see comment in irq.h).
+        // It needs to go at a higher priority than all those components that rely on
+        // the flash storage (eg higher than USB MSC).
         NVIC_SetPriority(FLASH_IRQn, IRQ_PRI_FLASH);
         HAL_NVIC_EnableIRQ(FLASH_IRQn);
     }

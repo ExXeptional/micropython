@@ -1,4 +1,4 @@
-.. _wipy_tutorial:
+.. _wipy_tutorial_index:
 
 WiPy tutorials and examples
 ===========================

@@ -1,4 +1,4 @@
-.. _pyboard_tutorial:
+.. _tutorial-index:
 
 MicroPython tutorial for the pyboard
 ====================================

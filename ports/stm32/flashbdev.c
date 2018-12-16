@@ -76,7 +76,7 @@ STATIC byte flash_cache_mem[0x4000] __attribute__((aligned(4))); // 16k
 #define FLASH_MEM_SEG2_START_ADDR (0x08140000) // sector 18
 #define FLASH_MEM_SEG2_NUM_BLOCKS (128) // sector 18: 64k(of 128k)
 
-#elif defined(STM32F746xx) || defined(STM32F765xx) || defined(STM32F767xx) || defined(STM32F769xx)
+#elif defined(STM32F746xx) || defined(STM32F767xx) || defined(STM32F769xx)
 
 // The STM32F746 doesn't really have CCRAM, so we use the 64K DTCM for this.
 
@@ -143,17 +143,14 @@ int32_t flash_bdev_ioctl(uint32_t op, uint32_t arg) {
             flash_bdev_irq_handler();
             return 0;
 
-        case BDEV_IOCTL_SYNC: {
-            uint32_t basepri = raise_irq_pri(IRQ_PRI_FLASH); // prevent cache flushing and USB access
+        case BDEV_IOCTL_SYNC:
             if (flash_flags & FLASH_FLAG_DIRTY) {
                 flash_flags |= FLASH_FLAG_FORCE_WRITE;
                 while (flash_flags & FLASH_FLAG_DIRTY) {
-                    flash_bdev_irq_handler();
+                   NVIC->STIR = FLASH_IRQn;
                 }
             }
-            restore_irq_pri(basepri);
             return 0;
-        }
     }
     return -MP_EINVAL;
 }
@@ -265,10 +262,8 @@ bool flash_bdev_writeblock(const uint8_t *src, uint32_t block) {
         // bad block number
         return false;
     }
-    uint32_t basepri = raise_irq_pri(IRQ_PRI_FLASH); // prevent cache flushing and USB access
     uint8_t *dest = flash_cache_get_addr_for_write(flash_addr);
     memcpy(dest, src, FLASH_BLOCK_SIZE);
-    restore_irq_pri(basepri);
     return true;
 }
 

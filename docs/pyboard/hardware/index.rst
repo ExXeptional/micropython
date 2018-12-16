@@ -1,3 +1,5 @@
+.. _hardware_index:
+
 The pyboard hardware
 --------------------
 

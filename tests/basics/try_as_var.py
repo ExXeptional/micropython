@@ -1,7 +1,7 @@
 try:
     raise ValueError(534)
 except ValueError as e:
-    print(type(e), e.args)
+    print(repr(e))
 
 # Var bound in except block is automatically deleted
 try:

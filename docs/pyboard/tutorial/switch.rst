@@ -1,5 +1,3 @@
-.. _pyboard_tutorial_switch:
-
 The Switch, callbacks and interrupts
 ====================================
 

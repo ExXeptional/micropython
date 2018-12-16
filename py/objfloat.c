@@ -161,7 +161,8 @@ STATIC mp_obj_t float_unary_op(mp_unary_op_t op, mp_obj_t o_in) {
         case MP_UNARY_OP_POSITIVE: return o_in;
         case MP_UNARY_OP_NEGATIVE: return mp_obj_new_float(-val);
         case MP_UNARY_OP_ABS: {
-            if (signbit(val)) {
+            // TODO check for NaN etc
+            if (val < 0) {
                 return mp_obj_new_float(-val);
             } else {
                 return o_in;
@@ -261,7 +262,7 @@ mp_obj_t mp_obj_float_binary_op(mp_binary_op_t op, mp_float_t lhs_val, mp_obj_t 
         case MP_BINARY_OP_INPLACE_FLOOR_DIVIDE:
             if (rhs_val == 0) {
                 zero_division_error:
-                mp_raise_msg(&mp_type_ZeroDivisionError, "divide by zero");
+                mp_raise_msg(&mp_type_ZeroDivisionError, "division by zero");
             }
             // Python specs require that x == (x//y)*y + (x%y) so we must
             // call divmod to compute the correct floor division, which

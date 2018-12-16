@@ -37,7 +37,6 @@
 #include "py/runtime.h"
 #include "py/objtuple.h"
 #include "py/mphal.h"
-#include "extmod/vfs.h"
 #include "extmod/misc.h"
 
 #ifdef __ANDROID__

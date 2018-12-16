@@ -1,9 +1,3 @@
-try:
-    bytes.count
-except AttributeError:
-    print("SKIP")
-    raise SystemExit
-
 print(b"".count(b""))
 print(b"".count(b"a"))
 print(b"a".count(b""))

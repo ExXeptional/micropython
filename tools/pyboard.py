@@ -81,12 +81,11 @@ def stdout_write_bytes(b):
     stdout.write(b)
     stdout.flush()
 
-class PyboardError(Exception):
+class PyboardError(BaseException):
     pass
 
 class TelnetToSerial:
     def __init__(self, ip, user, password, read_timeout=None):
-        self.tn = None
         import telnetlib
         self.tn = telnetlib.Telnet(ip, timeout=15)
         self.read_timeout = read_timeout
@@ -110,8 +109,11 @@ class TelnetToSerial:
         self.close()
 
     def close(self):
-        if self.tn:
+        try:
             self.tn.close()
+        except:
+            # the telnet object might not exist yet, so ignore this one
+            pass
 
     def read(self, size=1):
         while len(self.fifo) < size:
@@ -150,7 +152,7 @@ class ProcessToSerial:
 
     def __init__(self, cmd):
         import subprocess
-        self.subp = subprocess.Popen(cmd, bufsize=0, shell=True, preexec_fn=os.setsid,
+        self.subp = subprocess.Popen(cmd.split(), bufsize=0, shell=True, preexec_fn=os.setsid,
             stdin=subprocess.PIPE, stdout=subprocess.PIPE)
 
         # Initially was implemented with selectors, but that adds Python3

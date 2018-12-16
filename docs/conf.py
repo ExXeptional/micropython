@@ -21,20 +21,41 @@ import os
 # documentation root, use os.path.abspath to make it absolute, like shown here.
 sys.path.insert(0, os.path.abspath('.'))
 
+# Work out the port to generate the docs for
+from collections import OrderedDict
+micropy_port = os.getenv('MICROPY_PORT') or 'pyboard'
+tags.add('port_' + micropy_port)
+ports = OrderedDict((
+    ('unix', 'unix'),
+    ('pyboard', 'the pyboard'),
+    ('wipy', 'the WiPy'),
+    ('esp8266', 'the ESP8266'),
+))
+
 # The members of the html_context dict are available inside topindex.html
 micropy_version = os.getenv('MICROPY_VERSION') or 'latest'
 micropy_all_versions = (os.getenv('MICROPY_ALL_VERSIONS') or 'latest').split(',')
-url_pattern = '%s/en/%%s' % (os.getenv('MICROPY_URL_PREFIX') or '/',)
+url_pattern = '%s/en/%%s/%%s' % (os.getenv('MICROPY_URL_PREFIX') or '/',)
 html_context = {
-    'cur_version':micropy_version,
+    'port':micropy_port,
+    'port_name':ports[micropy_port],
+    'port_version':micropy_version,
+    'all_ports':[
+        (port_id, url_pattern % (micropy_version, port_id))
+            for port_id, port_name in ports.items()
+    ],
     'all_versions':[
-        (ver, url_pattern % ver) for ver in micropy_all_versions
+        (ver, url_pattern % (ver, micropy_port))
+            for ver in micropy_all_versions
     ],
     'downloads':[
-        ('PDF', url_pattern % micropy_version + '/micropython-docs.pdf'),
+        ('PDF', url_pattern % (micropy_version, 'micropython-%s.pdf' % micropy_port)),
     ],
 }
 
+
+# Specify a custom master document based on the port name
+master_doc = micropy_port + '_' + 'index'
 
 # -- General configuration ------------------------------------------------
 
@@ -50,6 +71,9 @@ extensions = [
     'sphinx.ext.intersphinx',
     'sphinx.ext.todo',
     'sphinx.ext.coverage',
+    'sphinx_selective_exclude.modindex_exclude',
+    'sphinx_selective_exclude.eager_only',
+    'sphinx_selective_exclude.search_auto_exclude',
 ]
 
 # Add any paths that contain templates here, relative to this directory.
@@ -62,7 +86,7 @@ source_suffix = '.rst'
 #source_encoding = 'utf-8-sig'
 
 # The master toctree document.
-master_doc = 'index'
+#master_doc = 'index'
 
 # General information about the project.
 project = 'MicroPython'
@@ -298,4 +322,25 @@ texinfo_documents = [
 
 
 # Example configuration for intersphinx: refer to the Python standard library.
-intersphinx_mapping = {'python': ('https://docs.python.org/3.5', None)}
+intersphinx_mapping = {'python': ('http://docs.python.org/3.5', None)}
+
+# Append the other ports' specific folders/files to the exclude pattern
+exclude_patterns.extend([port + '*' for port in ports if port != micropy_port])
+
+modules_port_specific = {
+    'pyboard': ['pyb'],
+    'wipy': ['wipy'],
+    'esp8266': ['esp'],
+}
+
+modindex_exclude = []
+
+for p, l in modules_port_specific.items():
+    if p != micropy_port:
+        modindex_exclude += l
+
+# Exclude extra modules per port
+modindex_exclude += {
+    'esp8266': ['cmath', 'select'],
+    'wipy': ['cmath'],
+}.get(micropy_port, [])
