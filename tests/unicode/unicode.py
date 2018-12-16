@@ -47,7 +47,3 @@ try:
     str(bytearray(b'ab\xc0a'), 'utf8')
 except UnicodeError:
     print('UnicodeError')
-try:
-    str(b'\xf0\xe0\xed\xe8', 'utf8')
-except UnicodeError:
-    print('UnicodeError')

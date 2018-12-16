@@ -180,7 +180,7 @@ bool utf8_check(const byte *p, size_t len) {
     for (; p < end; p++) {
         byte c = *p;
         if (need) {
-            if (UTF8_IS_CONT(c)) {
+            if (c >= 0x80) {
                 need--;
             } else {
                 // mismatch
