@@ -1,9 +1,3 @@
-try:
-    str.count
-except AttributeError:
-    print("SKIP")
-    raise SystemExit
-
 # mad.py
 # Alf Clement 27-Mar-2014
 #

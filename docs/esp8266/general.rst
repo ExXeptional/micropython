@@ -1,5 +1,3 @@
-.. _esp8266_general:
-
 General information about the ESP8266 port
 ==========================================
 

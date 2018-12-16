@@ -45,7 +45,7 @@ STATIC mp_obj_t machine_timer_callbacks[] = {
     NULL,
     NULL,
     NULL,
-#if defined(NRF52_SERIES)
+#if NRF52
     NULL,
     NULL,
 #endif
@@ -57,7 +57,7 @@ STATIC const machine_timer_obj_t machine_timer_obj[] = {
     {{&machine_timer_type}, NRFX_TIMER_INSTANCE(1)},
 #endif
     {{&machine_timer_type}, NRFX_TIMER_INSTANCE(2)},
-#if defined(NRF52_SERIES)
+#if NRF52
     {{&machine_timer_type}, NRFX_TIMER_INSTANCE(3)},
     {{&machine_timer_type}, NRFX_TIMER_INSTANCE(4)},
 #endif

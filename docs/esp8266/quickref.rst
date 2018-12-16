@@ -1,4 +1,4 @@
-.. _esp8266_quickref:
+.. _quickref:
 
 Quick reference for the ESP8266
 ===============================
@@ -8,15 +8,6 @@ Quick reference for the ESP8266
     :width: 640px
 
 The Adafruit Feather HUZZAH board (image attribution: Adafruit).
-
-Below is a quick reference for ESP8266-based boards.  If it is your first time
-working with this board please consider reading the following sections first:
-
-.. toctree::
-   :maxdepth: 1
-
-   general.rst
-   tutorial/index.rst
 
 Installing MicroPython
 ----------------------

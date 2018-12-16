@@ -45,18 +45,13 @@ Methods
 
    *eventmask* defaults to ``uselect.POLLIN | uselect.POLLOUT``.
 
-   It is OK to call this function multiple times for the same *obj*.
-   Successive calls will update *obj*'s eventmask to the value of
-   *eventmask* (i.e. will behave as `modify()`).
-
 .. method:: poll.unregister(obj)
 
    Unregister *obj* from polling.
 
 .. method:: poll.modify(obj, eventmask)
 
-   Modify the *eventmask* for *obj*. If *obj* is not registered, `OSError`
-   is raised with error of ENOENT.
+   Modify the *eventmask* for *obj*.
 
 .. method:: poll.poll(timeout=-1)
 

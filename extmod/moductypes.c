@@ -3,7 +3,7 @@
  *
  * The MIT License (MIT)
  *
- * Copyright (c) 2014-2018 Paul Sokolovsky
+ * Copyright (c) 2014 Paul Sokolovsky
  *
  * Permission is hereby granted, free of charge, to any person obtaining a copy
  * of this software and associated documentation files (the "Software"), to deal
@@ -92,7 +92,7 @@ enum {
 #define AGG_TYPE_BITS 2
 
 enum {
-    STRUCT, PTR, ARRAY,
+    STRUCT, PTR, ARRAY, BITFIELD,
 };
 
 // Here we need to set sign bit right
@@ -137,11 +137,7 @@ STATIC void uctypes_struct_print(const mp_print_t *print, mp_obj_t self_in, mp_p
     (void)kind;
     mp_obj_uctypes_struct_t *self = MP_OBJ_TO_PTR(self_in);
     const char *typen = "unk";
-    if (MP_OBJ_IS_TYPE(self->desc, &mp_type_dict)
-      #if MICROPY_PY_COLLECTIONS_ORDEREDDICT
-        || MP_OBJ_IS_TYPE(self->desc, &mp_type_ordereddict)
-      #endif
-      ) {
+    if (MP_OBJ_IS_TYPE(self->desc, &mp_type_dict)) {
         typen = "STRUCT";
     } else if (MP_OBJ_IS_TYPE(self->desc, &mp_type_tuple)) {
         mp_obj_tuple_t *t = MP_OBJ_TO_PTR(self->desc);
@@ -210,11 +206,7 @@ STATIC mp_uint_t uctypes_struct_agg_size(mp_obj_tuple_t *t, int layout_type, mp_
 }
 
 STATIC mp_uint_t uctypes_struct_size(mp_obj_t desc_in, int layout_type, mp_uint_t *max_field_size) {
-    if (!MP_OBJ_IS_TYPE(desc_in, &mp_type_dict)
-      #if MICROPY_PY_COLLECTIONS_ORDEREDDICT
-        && !MP_OBJ_IS_TYPE(desc_in, &mp_type_ordereddict)
-      #endif
-      ) {
+    if (!MP_OBJ_IS_TYPE(desc_in, &mp_type_dict)) {
         if (MP_OBJ_IS_TYPE(desc_in, &mp_type_tuple)) {
             return uctypes_struct_agg_size((mp_obj_tuple_t*)MP_OBJ_TO_PTR(desc_in), layout_type, max_field_size);
         } else if (MP_OBJ_IS_SMALL_INT(desc_in)) {
@@ -269,8 +261,7 @@ STATIC mp_uint_t uctypes_struct_size(mp_obj_t desc_in, int layout_type, mp_uint_
     return total_size;
 }
 
-STATIC mp_obj_t uctypes_struct_sizeof(size_t n_args, const mp_obj_t *args) {
-    mp_obj_t obj_in = args[0];
+STATIC mp_obj_t uctypes_struct_sizeof(mp_obj_t obj_in) {
     mp_uint_t max_field_size = 0;
     if (MP_OBJ_IS_TYPE(obj_in, &mp_type_bytearray)) {
         return mp_obj_len(obj_in);
@@ -279,22 +270,15 @@ STATIC mp_obj_t uctypes_struct_sizeof(size_t n_args, const mp_obj_t *args) {
     // We can apply sizeof either to structure definition (a dict)
     // or to instantiated structure
     if (MP_OBJ_IS_TYPE(obj_in, &uctypes_struct_type)) {
-        if (n_args != 1) {
-            mp_raise_TypeError(NULL);
-        }
         // Extract structure definition
         mp_obj_uctypes_struct_t *obj = MP_OBJ_TO_PTR(obj_in);
         obj_in = obj->desc;
         layout_type = obj->flags;
-    } else {
-        if (n_args == 2) {
-            layout_type = mp_obj_get_int(args[1]);
-        }
     }
     mp_uint_t size = uctypes_struct_size(obj_in, layout_type, &max_field_size);
     return MP_OBJ_NEW_SMALL_INT(size);
 }
-STATIC MP_DEFINE_CONST_FUN_OBJ_VAR_BETWEEN(uctypes_struct_sizeof_obj, 1, 2, uctypes_struct_sizeof);
+STATIC MP_DEFINE_CONST_FUN_OBJ_1(uctypes_struct_sizeof_obj, uctypes_struct_sizeof);
 
 static inline mp_obj_t get_unaligned(uint val_type, byte *p, int big_endian) {
     char struct_type = big_endian ? '>' : '<';
@@ -406,11 +390,8 @@ STATIC void set_aligned(uint val_type, void *p, mp_int_t index, mp_obj_t val) {
 STATIC mp_obj_t uctypes_struct_attr_op(mp_obj_t self_in, qstr attr, mp_obj_t set_val) {
     mp_obj_uctypes_struct_t *self = MP_OBJ_TO_PTR(self_in);
 
-    if (!MP_OBJ_IS_TYPE(self->desc, &mp_type_dict)
-      #if MICROPY_PY_COLLECTIONS_ORDEREDDICT
-        && !MP_OBJ_IS_TYPE(self->desc, &mp_type_ordereddict)
-      #endif
-      ) {
+    // TODO: Support at least OrderedDict in addition
+    if (!MP_OBJ_IS_TYPE(self->desc, &mp_type_dict)) {
             mp_raise_TypeError("struct: no fields");
     }
 

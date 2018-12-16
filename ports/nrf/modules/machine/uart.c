@@ -50,6 +50,7 @@
 typedef struct _machine_hard_uart_obj_t {
     mp_obj_base_t       base;
     const nrfx_uart_t * p_uart;      // Driver instance
+    byte                char_width;  // 0 for 7,8 bit chars, 1 for 9 bit chars
 } machine_hard_uart_obj_t;
 
 static const nrfx_uart_t instance0 = NRFX_UART_INSTANCE(0);
@@ -245,9 +246,13 @@ STATIC mp_obj_t machine_hard_uart_writechar(mp_obj_t self_in, mp_obj_t char_in) 
     machine_hard_uart_obj_t *self = self_in;
 
     // get the character to write (might be 9 bits)
-    int data = mp_obj_get_int(char_in);
+    uint16_t data = mp_obj_get_int(char_in);
 
-    nrfx_err_t err = uart_tx_char(self, data);
+    nrfx_err_t err = NRFX_SUCCESS;
+    for (int i = 0; i < 2; i++) {
+        err = uart_tx_char(self, (int)(&data)[i]);
+    }
+
     if (err != NRFX_SUCCESS) {
         mp_hal_raise(err);
     }
@@ -297,17 +302,43 @@ STATIC mp_uint_t machine_hard_uart_read(mp_obj_t self_in, void *buf_in, mp_uint_
     const machine_hard_uart_obj_t *self = self_in;
     byte *buf = buf_in;
 
-    // read the data
-    for (size_t i = 0; i < size; i++) {
-        buf[i] = uart_rx_char(self);
+    // check that size is a multiple of character width
+    if (size & self->char_width) {
+        *errcode = MP_EIO;
+        return MP_STREAM_ERROR;
     }
 
-    return size;
+    // convert byte size to char size
+    size >>= self->char_width;
+
+    // make sure we want at least 1 char
+    if (size == 0) {
+        return 0;
+    }
+
+    // read the data
+    byte * orig_buf = buf;
+    for (;;) {
+        int data = uart_rx_char(self);
+
+        *buf++ = data;
+
+        if (--size == 0) {
+            // return number of bytes read
+            return buf - orig_buf;
+        }
+    }
 }
 
 STATIC mp_uint_t machine_hard_uart_write(mp_obj_t self_in, const void *buf_in, mp_uint_t size, int *errcode) {
     machine_hard_uart_obj_t *self = self_in;
     const byte *buf = buf_in;
+
+    // check that size is a multiple of character width
+    if (size & self->char_width) {
+        *errcode = MP_EIO;
+        return MP_STREAM_ERROR;
+    }
 
     nrfx_err_t err = NRFX_SUCCESS;
     for (int i = 0; i < size; i++) {

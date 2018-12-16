@@ -108,7 +108,7 @@ def f():
     # closed over variables
     x = 1
     def closure():
-        nonlocal x; a = x + 1
+        a = x + 1
         x = 1
         del x
 

@@ -1,5 +1,3 @@
-.. _pyboard_general:
-
 General information about the pyboard
 =====================================
 
@@ -78,7 +76,5 @@ The following PDF guide gives information about using the pyboard with Windows,
 including setting up the serial prompt and downloading new firmware using
 DFU programming:
 `PDF guide <http://micropython.org/resources/Micro-Python-Windows-setup.pdf>`__.
-
-.. _hardware_index:
 
 .. include:: hardware/index.rst

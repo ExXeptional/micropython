@@ -1,13 +1,10 @@
 # Test for sdcard block protocol
 # Peter hinch 30th Jan 2016
-import os, sdcard, machine
+import os, sdcard, pyb
 
 def sdtest():
-    spi = machine.SPI(1)
-    spi.init()  # Ensure right baudrate
-    sd = sdcard.SDCard(spi, machine.Pin.board.X21) # Compatible with PCB
-    vfs = os.VfsFat(sd)
-    os.mount(vfs, '/fc')
+    sd = sdcard.SDCard(pyb.SPI(1), pyb.Pin.board.X21) # Compatible with PCB
+    pyb.mount(sd, '/fc')
     print('Filesystem check')
     print(os.listdir('/fc'))
 
@@ -41,7 +38,7 @@ def sdtest():
         result2 = f.read()
         print(len(result2), 'bytes read')
 
-    os.umount('/fc')
+    pyb.mount(None, '/fc')
 
     print()
     print('Verifying data read back')

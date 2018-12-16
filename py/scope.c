@@ -64,9 +64,10 @@ void scope_free(scope_t *scope) {
     m_del(scope_t, scope, 1);
 }
 
-id_info_t *scope_find_or_add_id(scope_t *scope, qstr qst, scope_kind_t kind) {
+id_info_t *scope_find_or_add_id(scope_t *scope, qstr qst, bool *added) {
     id_info_t *id_info = scope_find(scope, qst);
     if (id_info != NULL) {
+        *added = false;
         return id_info;
     }
 
@@ -81,10 +82,11 @@ id_info_t *scope_find_or_add_id(scope_t *scope, qstr qst, scope_kind_t kind) {
     // handled by the compiler because it adds arguments before compiling the body
     id_info = &scope->id_info[scope->id_info_len++];
 
-    id_info->kind = kind;
+    id_info->kind = 0;
     id_info->flags = 0;
     id_info->local_num = 0;
     id_info->qst = qst;
+    *added = true;
     return id_info;
 }
 
@@ -108,8 +110,9 @@ STATIC void scope_close_over_in_parents(scope_t *scope, qstr qst) {
     assert(scope->parent != NULL); // we should have at least 1 parent
     for (scope_t *s = scope->parent;; s = s->parent) {
         assert(s->parent != NULL); // we should not get to the outer scope
-        id_info_t *id = scope_find_or_add_id(s, qst, ID_INFO_KIND_UNDECIDED);
-        if (id->kind == ID_INFO_KIND_UNDECIDED) {
+        bool added;
+        id_info_t *id = scope_find_or_add_id(s, qst, &added);
+        if (added) {
             // variable not previously declared in this scope, so declare it as free and keep searching parents
             id->kind = ID_INFO_KIND_FREE;
         } else {
@@ -127,19 +130,21 @@ STATIC void scope_close_over_in_parents(scope_t *scope, qstr qst) {
     }
 }
 
-void scope_check_to_close_over(scope_t *scope, id_info_t *id) {
+void scope_find_local_and_close_over(scope_t *scope, id_info_t *id, qstr qst) {
     if (scope->parent != NULL) {
         for (scope_t *s = scope->parent; s->parent != NULL; s = s->parent) {
-            id_info_t *id2 = scope_find(s, id->qst);
+            id_info_t *id2 = scope_find(s, qst);
             if (id2 != NULL) {
                 if (id2->kind == ID_INFO_KIND_LOCAL || id2->kind == ID_INFO_KIND_CELL || id2->kind == ID_INFO_KIND_FREE) {
                     id->kind = ID_INFO_KIND_FREE;
-                    scope_close_over_in_parents(scope, id->qst);
+                    scope_close_over_in_parents(scope, qst);
+                    return;
                 }
                 break;
             }
         }
     }
+    id->kind = ID_INFO_KIND_GLOBAL_IMPLICIT;
 }
 
 #endif // MICROPY_ENABLE_COMPILER
