@@ -104,7 +104,6 @@
 #define MICROPY_PY_MATH_SPECIAL_FUNCTIONS (1)
 #endif
 #define MICROPY_PY_CMATH            (1)
-#define MICROPY_PY_IO_IOBASE        (1)
 #define MICROPY_PY_IO_FILEIO        (1)
 #define MICROPY_PY_GC_COLLECT_RETVAL (1)
 #define MICROPY_MODULE_FROZEN_STR   (1)
@@ -127,7 +126,6 @@
 #define MICROPY_PY_UHASHLIB         (1)
 #if MICROPY_PY_USSL
 #define MICROPY_PY_UHASHLIB_SHA1    (1)
-#define MICROPY_PY_UCRYPTOLIB       (1)
 #endif
 #define MICROPY_PY_UBINASCII        (1)
 #define MICROPY_PY_UBINASCII_CRC32  (1)

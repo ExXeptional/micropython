@@ -401,7 +401,8 @@ void spi_deinit(const spi_t *spi_obj) {
     }
 }
 
-STATIC HAL_StatusTypeDef spi_wait_dma_finished(const spi_t *spi, uint32_t t_start, uint32_t timeout) {
+STATIC HAL_StatusTypeDef spi_wait_dma_finished(const spi_t *spi, uint32_t timeout) {
+    uint32_t start = HAL_GetTick();
     volatile HAL_SPI_StateTypeDef *state = &spi->spi->State;
     for (;;) {
         // Do an atomic check of the state; WFI will exit even if IRQs are disabled
@@ -412,7 +413,7 @@ STATIC HAL_StatusTypeDef spi_wait_dma_finished(const spi_t *spi, uint32_t t_star
         }
         __WFI();
         enable_irq(irq_state);
-        if (HAL_GetTick() - t_start >= timeout) {
+        if (HAL_GetTick() - start >= timeout) {
             return HAL_TIMEOUT;
         }
     }
@@ -429,8 +430,6 @@ STATIC void spi_transfer(const spi_t *self, size_t len, const uint8_t *src, uint
     // time directly after the SPI/DMA is initialised.  The cause of this is
     // unknown but we sidestep the issue by using polling for 1 byte transfer.
 
-    // Note: DMA transfers are limited to 65535 bytes at a time.
-
     HAL_StatusTypeDef status;
 
     if (dest == NULL) {
@@ -443,20 +442,10 @@ STATIC void spi_transfer(const spi_t *self, size_t len, const uint8_t *src, uint
             self->spi->hdmatx = &tx_dma;
             self->spi->hdmarx = NULL;
             MP_HAL_CLEAN_DCACHE(src, len);
-            uint32_t t_start = HAL_GetTick();
-            do {
-                uint32_t l = MIN(len, 65535);
-                status = HAL_SPI_Transmit_DMA(self->spi, (uint8_t*)src, l);
-                if (status != HAL_OK) {
-                    break;
-                }
-                status = spi_wait_dma_finished(self, t_start, timeout);
-                if (status != HAL_OK) {
-                    break;
-                }
-                len -= l;
-                src += l;
-            } while (len);
+            status = HAL_SPI_Transmit_DMA(self->spi, (uint8_t*)src, len);
+            if (status == HAL_OK) {
+                status = spi_wait_dma_finished(self, timeout);
+            }
             dma_deinit(self->tx_dma_descr);
         }
     } else if (src == NULL) {
@@ -475,20 +464,10 @@ STATIC void spi_transfer(const spi_t *self, size_t len, const uint8_t *src, uint
             dma_init(&rx_dma, self->rx_dma_descr, self->spi);
             self->spi->hdmarx = &rx_dma;
             MP_HAL_CLEANINVALIDATE_DCACHE(dest, len);
-            uint32_t t_start = HAL_GetTick();
-            do {
-                uint32_t l = MIN(len, 65535);
-                status = HAL_SPI_Receive_DMA(self->spi, dest, l);
-                if (status != HAL_OK) {
-                    break;
-                }
-                status = spi_wait_dma_finished(self, t_start, timeout);
-                if (status != HAL_OK) {
-                    break;
-                }
-                len -= l;
-                dest += l;
-            } while (len);
+            status = HAL_SPI_Receive_DMA(self->spi, dest, len);
+            if (status == HAL_OK) {
+                status = spi_wait_dma_finished(self, timeout);
+            }
             if (self->spi->hdmatx != NULL) {
                 dma_deinit(self->tx_dma_descr);
             }
@@ -506,21 +485,10 @@ STATIC void spi_transfer(const spi_t *self, size_t len, const uint8_t *src, uint
             self->spi->hdmarx = &rx_dma;
             MP_HAL_CLEAN_DCACHE(src, len);
             MP_HAL_CLEANINVALIDATE_DCACHE(dest, len);
-            uint32_t t_start = HAL_GetTick();
-            do {
-                uint32_t l = MIN(len, 65535);
-                status = HAL_SPI_TransmitReceive_DMA(self->spi, (uint8_t*)src, dest, l);
-                if (status != HAL_OK) {
-                    break;
-                }
-                status = spi_wait_dma_finished(self, t_start, timeout);
-                if (status != HAL_OK) {
-                    break;
-                }
-                len -= l;
-                src += l;
-                dest += l;
-            } while (len);
+            status = HAL_SPI_TransmitReceive_DMA(self->spi, (uint8_t*)src, dest, len);
+            if (status == HAL_OK) {
+                status = spi_wait_dma_finished(self, timeout);
+            }
             dma_deinit(self->tx_dma_descr);
             dma_deinit(self->rx_dma_descr);
         }
@@ -603,7 +571,7 @@ STATIC const pyb_spi_obj_t pyb_spi_obj[] = {
 };
 
 STATIC void pyb_spi_print(const mp_print_t *print, mp_obj_t self_in, mp_print_kind_t kind) {
-    pyb_spi_obj_t *self = MP_OBJ_TO_PTR(self_in);
+    pyb_spi_obj_t *self = self_in;
     spi_print(print, self->spi, true);
 }
 
@@ -625,7 +593,7 @@ STATIC mp_obj_t pyb_spi_init_helper(const pyb_spi_obj_t *self, size_t n_args, co
         { MP_QSTR_nss,      MP_ARG_KW_ONLY | MP_ARG_INT,  {.u_int = SPI_NSS_SOFT} },
         { MP_QSTR_firstbit, MP_ARG_KW_ONLY | MP_ARG_INT,  {.u_int = SPI_FIRSTBIT_MSB} },
         { MP_QSTR_ti,       MP_ARG_KW_ONLY | MP_ARG_BOOL, {.u_bool = false} },
-        { MP_QSTR_crc,      MP_ARG_KW_ONLY | MP_ARG_OBJ,  {.u_rom_obj = MP_ROM_PTR(&mp_const_none_obj)} },
+        { MP_QSTR_crc,      MP_ARG_KW_ONLY | MP_ARG_OBJ,  {.u_obj = mp_const_none} },
     };
 
     // parse args
@@ -688,18 +656,18 @@ STATIC mp_obj_t pyb_spi_make_new(const mp_obj_type_t *type, size_t n_args, size_
         pyb_spi_init_helper(spi_obj, n_args - 1, args + 1, &kw_args);
     }
 
-    return MP_OBJ_FROM_PTR(spi_obj);
+    return (mp_obj_t)spi_obj;
 }
 
 STATIC mp_obj_t pyb_spi_init(size_t n_args, const mp_obj_t *args, mp_map_t *kw_args) {
-    return pyb_spi_init_helper(MP_OBJ_TO_PTR(args[0]), n_args - 1, args + 1, kw_args);
+    return pyb_spi_init_helper(args[0], n_args - 1, args + 1, kw_args);
 }
 STATIC MP_DEFINE_CONST_FUN_OBJ_KW(pyb_spi_init_obj, 1, pyb_spi_init);
 
 /// \method deinit()
 /// Turn off the SPI bus.
 STATIC mp_obj_t pyb_spi_deinit(mp_obj_t self_in) {
-    pyb_spi_obj_t *self = MP_OBJ_TO_PTR(self_in);
+    pyb_spi_obj_t *self = self_in;
     spi_deinit(self->spi);
     return mp_const_none;
 }
@@ -721,7 +689,7 @@ STATIC mp_obj_t pyb_spi_send(size_t n_args, const mp_obj_t *pos_args, mp_map_t *
     };
 
     // parse args
-    pyb_spi_obj_t *self = MP_OBJ_TO_PTR(pos_args[0]);
+    pyb_spi_obj_t *self = pos_args[0];
     mp_arg_val_t args[MP_ARRAY_SIZE(allowed_args)];
     mp_arg_parse_all(n_args - 1, pos_args + 1, kw_args, MP_ARRAY_SIZE(allowed_args), allowed_args, args);
 
@@ -756,7 +724,7 @@ STATIC mp_obj_t pyb_spi_recv(size_t n_args, const mp_obj_t *pos_args, mp_map_t *
     };
 
     // parse args
-    pyb_spi_obj_t *self = MP_OBJ_TO_PTR(pos_args[0]);
+    pyb_spi_obj_t *self = pos_args[0];
     mp_arg_val_t args[MP_ARRAY_SIZE(allowed_args)];
     mp_arg_parse_all(n_args - 1, pos_args + 1, kw_args, MP_ARRAY_SIZE(allowed_args), allowed_args, args);
 
@@ -797,7 +765,7 @@ STATIC mp_obj_t pyb_spi_send_recv(size_t n_args, const mp_obj_t *pos_args, mp_ma
     };
 
     // parse args
-    pyb_spi_obj_t *self = MP_OBJ_TO_PTR(pos_args[0]);
+    pyb_spi_obj_t *self = pos_args[0];
     mp_arg_val_t args[MP_ARRAY_SIZE(allowed_args)];
     mp_arg_parse_all(n_args - 1, pos_args + 1, kw_args, MP_ARRAY_SIZE(allowed_args), allowed_args, args);
 
@@ -918,7 +886,7 @@ STATIC const machine_hard_spi_obj_t machine_hard_spi_obj[] = {
 };
 
 STATIC void machine_hard_spi_print(const mp_print_t *print, mp_obj_t self_in, mp_print_kind_t kind) {
-    machine_hard_spi_obj_t *self = MP_OBJ_TO_PTR(self_in);
+    machine_hard_spi_obj_t *self = (machine_hard_spi_obj_t*)self_in;
     spi_print(print, self->spi, false);
 }
 
@@ -1016,15 +984,15 @@ const mp_obj_type_t machine_hard_spi_type = {
     .print = machine_hard_spi_print,
     .make_new = mp_machine_spi_make_new, // delegate to master constructor
     .protocol = &machine_hard_spi_p,
-    .locals_dict = (mp_obj_dict_t*)&mp_machine_spi_locals_dict,
+    .locals_dict = (mp_obj_t)&mp_machine_spi_locals_dict,
 };
 
 const spi_t *spi_from_mp_obj(mp_obj_t o) {
     if (MP_OBJ_IS_TYPE(o, &pyb_spi_type)) {
-        pyb_spi_obj_t *self = MP_OBJ_TO_PTR(o);
+        pyb_spi_obj_t *self = o;
         return self->spi;
     } else if (MP_OBJ_IS_TYPE(o, &machine_hard_spi_type)) {
-        machine_hard_spi_obj_t *self = MP_OBJ_TO_PTR(o);
+        machine_hard_spi_obj_t *self = o;;
         return self->spi;
     } else {
         mp_raise_TypeError("expecting an SPI object");

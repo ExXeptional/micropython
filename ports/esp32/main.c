@@ -116,8 +116,6 @@ soft_reset:
     mp_thread_deinit();
     #endif
 
-    gc_sweep_all();
-
     mp_hal_stdout_tx_str("PYB: soft reboot\r\n");
 
     // deinitialise peripherals
@@ -131,8 +129,8 @@ soft_reset:
 
 void app_main(void) {
     nvs_flash_init();
-    mp_main_task_handle = xTaskCreateStaticPinnedToCore(mp_task, "mp_task", MP_TASK_STACK_LEN, NULL, MP_TASK_PRIORITY,
-                                                        &mp_task_stack[0], &mp_task_tcb, 0);
+    xTaskCreateStaticPinnedToCore(mp_task, "mp_task", MP_TASK_STACK_LEN, NULL, MP_TASK_PRIORITY,
+                                  &mp_task_stack[0], &mp_task_tcb, 0);
 }
 
 void nlr_jump_fail(void *val) {

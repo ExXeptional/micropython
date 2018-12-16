@@ -108,6 +108,7 @@ void mp_init(void) {
     for (size_t i = 0; i < MICROPY_PY_OS_DUPTERM; ++i) {
         MP_STATE_VM(dupterm_objs[i]) = MP_OBJ_NULL;
     }
+    MP_STATE_VM(dupterm_arr_obj) = MP_OBJ_NULL;
     #endif
 
     #if MICROPY_FSUSERMOUNT
@@ -496,11 +497,11 @@ mp_obj_t mp_binary_op(mp_binary_op_t op, mp_obj_t lhs, mp_obj_t rhs) {
                 default:
                     goto unsupported_op;
             }
-            // This is an inlined version of mp_obj_new_int, for speed
+            // TODO: We just should make mp_obj_new_int() inline and use that
             if (MP_SMALL_INT_FITS(lhs_val)) {
                 return MP_OBJ_NEW_SMALL_INT(lhs_val);
             } else {
-                return mp_obj_new_int_from_ll(lhs_val);
+                return mp_obj_new_int(lhs_val);
             }
 #if MICROPY_PY_BUILTINS_FLOAT
         } else if (mp_obj_is_float(rhs)) {
@@ -1394,7 +1395,7 @@ void mp_import_all(mp_obj_t module) {
     DEBUG_printf("import all %p\n", module);
 
     // TODO: Support __all__
-    mp_map_t *map = &mp_obj_module_get_globals(module)->map;
+    mp_map_t *map = mp_obj_dict_get_map(MP_OBJ_FROM_PTR(mp_obj_module_get_globals(module)));
     for (size_t i = 0; i < map->alloc; i++) {
         if (MP_MAP_SLOT_IS_FILLED(map, i)) {
             qstr name = MP_OBJ_QSTR_VALUE(map->table[i].key);

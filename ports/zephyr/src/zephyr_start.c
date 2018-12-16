@@ -30,7 +30,7 @@
 int real_main(void);
 
 void main(void) {
-#ifdef CONFIG_CONSOLE_SUBSYS
+#ifdef CONFIG_CONSOLE_PULL
     console_init();
 #else
     zephyr_getchar_init();

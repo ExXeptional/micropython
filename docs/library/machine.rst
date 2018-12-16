@@ -74,14 +74,20 @@ Power related functions
    to know that we are coming from `machine.DEEPSLEEP`. For wake up to actually happen,
    wake sources should be configured first, like `Pin` change or `RTC` timeout.
 
-.. function:: wake_reason()
+.. only:: port_wipy
 
-   Get the wake reason. See :ref:`constants <machine_constants>` for the possible return values.
+    .. function:: wake_reason()
 
-   Availability: ESP32, WiPy.
+        Get the wake reason. See :ref:`constants <machine_constants>` for the possible return values.
 
 Miscellaneous functions
 -----------------------
+
+.. only:: port_wipy
+
+    .. function:: rng()
+
+        Return a 24-bit software generated random number.
 
 .. function:: unique_id()
 
@@ -105,12 +111,6 @@ Miscellaneous functions
    (*) above, and -1 if there was timeout during the main measurement, marked (**)
    above. The timeout is the same for both cases and given by *timeout_us* (which
    is in microseconds).
-
-.. function:: rng()
-
-   Return a 24-bit software generated random number.
-
-   Availability: WiPy.
 
 .. _machine_constants:
 
@@ -140,16 +140,31 @@ Constants
 Classes
 -------
 
-.. toctree::
+.. only:: not port_wipy
+
+ .. toctree::
    :maxdepth: 1
 
    machine.Pin.rst
    machine.Signal.rst
-   machine.ADC.rst
    machine.UART.rst
    machine.SPI.rst
    machine.I2C.rst
    machine.RTC.rst
    machine.Timer.rst
    machine.WDT.rst
+
+.. only:: port_wipy
+
+ .. toctree::
+   :maxdepth: 1
+
+   machine.Pin.rst
+   machine.UART.rst
+   machine.SPI.rst
+   machine.I2C.rst
+   machine.RTC.rst
+   machine.Timer.rst
+   machine.WDT.rst
+   machine.ADC.rst
    machine.SD.rst

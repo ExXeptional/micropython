@@ -41,7 +41,6 @@ enum {
   PORT_K,
 };
 
-// Must have matching entries in SUPPORTED_FN in boards/make-pins.py
 enum {
   AF_FN_TIM,
   AF_FN_I2C,

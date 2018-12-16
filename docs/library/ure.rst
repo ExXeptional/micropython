@@ -20,19 +20,14 @@ Supported operators are:
    including negated sets (e.g. ``[^a-c]``).
 
 ``'^'``
-   Match the start of the string.
 
 ``'$'``
-   Match the end of the string.
 
 ``'?'``
-   Match zero or one of the previous entity.
 
 ``'*'``
-   Match zero or more of the previous entity.
 
 ``'+'``
-   Match one or more of the previous entity.
 
 ``'??'``
 
@@ -41,7 +36,6 @@ Supported operators are:
 ``'+?'``
 
 ``'|'``
-   Match either the LHS or the RHS of this operator.
 
 ``'(...)'``
    Grouping. Each group is capturing (a substring it captures can be accessed
@@ -70,22 +64,6 @@ Functions
    string for first position which matches regex (which still may be
    0 if regex is anchored).
 
-.. function:: sub(regex_str, replace, string, count=0, flags=0)
-
-   Compile *regex_str* and search for it in *string*, replacing all matches
-   with *replace*, and returning the new string.
-
-   *replace* can be a string or a function.  If it is a string then escape
-   sequences of the form ``\<number>`` and ``\g<number>`` can be used to
-   expand to the corresponding group (or an empty string for unmatched groups).
-   If *replace* is a function then it must take a single argument (the match)
-   and should return a replacement string.
-
-   If *count* is specified and non-zero then substitution will stop after
-   this many substitutions are made.  The *flags* argument is ignored.
-
-   Note: availability of this function depends on `MicroPython port`.
-
 .. data:: DEBUG
 
    Flag value, display debug information about compiled expression.
@@ -102,10 +80,8 @@ Compiled regular expression. Instances of this class are created using
 
 .. method:: regex.match(string)
             regex.search(string)
-            regex.sub(replace, string, count=0, flags=0)
 
-   Similar to the module-level functions :meth:`match`, :meth:`search`
-   and :meth:`sub`.
+   Similar to the module-level functions :meth:`match` and :meth:`search`.
    Using methods is (much) more efficient if the same regex is applied to
    multiple strings.
 
@@ -118,31 +94,9 @@ Compiled regular expression. Instances of this class are created using
 Match objects
 -------------
 
-Match objects as returned by `match()` and `search()` methods, and passed
-to the replacement function in `sub()`.
+Match objects as returned by `match()` and `search()` methods.
 
 .. method:: match.group([index])
 
    Return matching (sub)string. *index* is 0 for entire match,
    1 and above for each capturing group. Only numeric groups are supported.
-
-.. method:: match.groups()
-
-   Return a tuple containing all the substrings of the groups of the match.
-
-   Note: availability of this method depends on `MicroPython port`.
-
-.. method:: match.start([index])
-            match.end([index])
-
-   Return the index in the original string of the start or end of the
-   substring group that was matched.  *index* defaults to the entire
-   group, otherwise it will select a group.
-
-   Note: availability of these methods depends on `MicroPython port`.
-
-.. method:: match.span([index])
-
-   Returns the 2-tuple ``(match.start(index), match.end(index))``.
-
-   Note: availability of this method depends on `MicroPython port`.

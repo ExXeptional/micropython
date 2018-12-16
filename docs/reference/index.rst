@@ -25,4 +25,10 @@ implementation and the best practices to use them.
    speed_python.rst
    constrained.rst
    packages.rst
-   asm_thumb2_index.rst
+
+.. only:: port_pyboard
+
+   .. toctree::
+      :maxdepth: 1
+
+      asm_thumb2_index.rst

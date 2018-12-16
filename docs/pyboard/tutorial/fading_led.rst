@@ -3,9 +3,7 @@ Fading LEDs
 
 In addition to turning LEDs on and off, it is also possible to control the brightness of an LED using `Pulse-Width Modulation (PWM) <http://en.wikipedia.org/wiki/Pulse-width_modulation>`_, a common technique for obtaining variable output from a digital pin. This allows us to fade an LED:
 
-.. only:: not latex
-
-   .. image:: http://upload.wikimedia.org/wikipedia/commons/a/a9/Fade.gif
+.. image:: http://upload.wikimedia.org/wikipedia/commons/a/a9/Fade.gif
 
 Components
 ----------

@@ -28,7 +28,6 @@ endif
 
 # source files
 SRC_C = \
-	lib/utils/printf.c \
 	ports/unix/main.c \
 	ports/unix/file.c \
 	ports/unix/input.c \
