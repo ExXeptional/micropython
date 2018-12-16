@@ -3,7 +3,6 @@
 // options to control how MicroPython is built
 
 #define MICROPY_OBJ_REPR            (MICROPY_OBJ_REPR_C)
-#define MICROPY_GC_STACK_ENTRY_TYPE uint16_t
 #define MICROPY_ALLOC_PATH_MAX      (128)
 #define MICROPY_ALLOC_LEXER_INDENT_INIT (8)
 #define MICROPY_ALLOC_PARSE_RULE_INIT   (48)
@@ -201,7 +200,6 @@ extern const struct _mp_obj_module_t mp_module_onewire;
 #define MICROPY_PORT_ROOT_POINTERS \
     const char *readline_hist[8]; \
     mp_obj_t pin_irq_handler[16]; \
-    byte *uart0_rxbuf; \
 
 // We need to provide a declaration/definition of alloca()
 #include <alloca.h>

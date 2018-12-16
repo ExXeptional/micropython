@@ -59,7 +59,7 @@ STATIC int chan_gpio[LEDC_CHANNEL_MAX];
 // Config of timer upon which we run all PWM'ed GPIO pins
 STATIC bool pwm_inited = false;
 STATIC ledc_timer_config_t timer_cfg = {
-    .duty_resolution = PWRES,
+    .bit_num = PWRES,
     .freq_hz = PWFREQ,
     .speed_mode = PWMODE,
     .timer_num = PWTIMER
@@ -77,28 +77,10 @@ STATIC void pwm_init(void) {
 }
 
 STATIC int set_freq(int newval) {
-    int ores = timer_cfg.duty_resolution;
     int oval = timer_cfg.freq_hz;
 
-    // Find the highest bit resolution for the requested frequency
-    if (newval <= 0) {
-        newval = 1;
-    }
-    unsigned int res = 0;
-    for (unsigned int i = LEDC_APB_CLK_HZ / newval; i > 1; i >>= 1, ++res) {
-    }
-    if (res == 0) {
-        res = 1;
-    } else if (res > PWRES) {
-        // Limit resolution to PWRES to match units of our duty
-        res = PWRES;
-    }
-
-    // Configure the new resolution and frequency
-    timer_cfg.duty_resolution = res;
     timer_cfg.freq_hz = newval;
     if (ledc_timer_config(&timer_cfg) != ESP_OK) {
-        timer_cfg.duty_resolution = ores;
         timer_cfg.freq_hz = oval;
         return 0;
     }
@@ -156,7 +138,7 @@ STATIC void esp32_pwm_init_helper(esp32_pwm_obj_t *self,
     if (chan_gpio[channel] == -1) {
         ledc_channel_config_t cfg = {
             .channel = channel,
-            .duty = (1 << timer_cfg.duty_resolution) / 2,
+            .duty = (1 << PWRES) / 2,
             .gpio_num = self->pin,
             .intr_type = LEDC_INTR_DISABLE,
             .speed_mode = PWMODE,
@@ -184,7 +166,6 @@ STATIC void esp32_pwm_init_helper(esp32_pwm_obj_t *self,
     int dval = args[ARG_duty].u_int;
     if (dval != -1) {
         dval &= ((1 << PWRES)-1);
-        dval >>= PWRES - timer_cfg.duty_resolution;
         ledc_set_duty(PWMODE, channel, dval);
         ledc_update_duty(PWMODE, channel);
     }
@@ -234,7 +215,6 @@ STATIC mp_obj_t esp32_pwm_deinit(mp_obj_t self_in) {
         ledc_stop(PWMODE, chan, 0);
         self->active = 0;
         self->channel = -1;
-        gpio_matrix_out(self->pin, SIG_GPIO_OUT_IDX, false, false);
     }
     return mp_const_none;
 }
@@ -264,14 +244,12 @@ STATIC mp_obj_t esp32_pwm_duty(size_t n_args, const mp_obj_t *args) {
     if (n_args == 1) {
         // get
         duty = ledc_get_duty(PWMODE, self->channel);
-        duty <<= PWRES - timer_cfg.duty_resolution;
         return MP_OBJ_NEW_SMALL_INT(duty);
     }
 
     // set
     duty = mp_obj_get_int(args[1]);
     duty &= ((1 << PWRES)-1);
-    duty >>= PWRES - timer_cfg.duty_resolution;
     ledc_set_duty(PWMODE, self->channel, duty);
     ledc_update_duty(PWMODE, self->channel);
 
