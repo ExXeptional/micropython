@@ -35,6 +35,11 @@
 #include "extint.h"
 #include "irq.h"
 
+#include "driverlib/gpio.h"
+#include "inc/hw_memmap.h"
+#include "inc/hw_ints.h"
+#include "handlers.h"
+
 /// \moduleref pyb
 /// \class ExtInt - configure I/O pins to interrupt on external events
 ///
@@ -85,265 +90,215 @@
 
 #define EXTI_OFFSET (EXTI_BASE - PERIPH_BASE)
 
-// Macro used to set/clear the bit corresponding to the line in the IMR/EMR
-// register in an atomic fashion by using bitband addressing.
-#define EXTI_MODE_BB(mode, line) (*(__IO uint32_t *)(PERIPH_BB_BASE + ((EXTI_OFFSET + (mode)) * 32) + ((line) * 4)))
-
-#if defined(STM32L4)
-// The L4 MCU supports 40 Events/IRQs lines of the type configurable and direct.
-// Here we only support configurable line types.  Details, see page 330 of RM0351, Rev 1.
-// The USB_FS_WAKUP event is a direct type and there is no support for it.
-#define EXTI_Mode_Interrupt offsetof(EXTI_TypeDef, IMR1)
-#define EXTI_Mode_Event     offsetof(EXTI_TypeDef, EMR1)
-#define EXTI_RTSR EXTI->RTSR1
-#define EXTI_FTSR EXTI->FTSR1
-#elif defined(STM32H7)
-#define EXTI_Mode_Interrupt offsetof(EXTI_Core_TypeDef, IMR1)
-#define EXTI_Mode_Event     offsetof(EXTI_Core_TypeDef, EMR1)
-#define EXTI_RTSR EXTI->RTSR1
-#define EXTI_FTSR EXTI->FTSR1
-#else
-#define EXTI_Mode_Interrupt offsetof(EXTI_TypeDef, IMR)
-#define EXTI_Mode_Event     offsetof(EXTI_TypeDef, EMR)
-#define EXTI_RTSR EXTI->RTSR
-#define EXTI_FTSR EXTI->FTSR
-#endif
-
-#define EXTI_SWIER_BB(line) (*(__IO uint32_t *)(PERIPH_BB_BASE + ((EXTI_OFFSET + offsetof(EXTI_TypeDef, SWIER)) * 32) + ((line) * 4)))
-
-typedef struct {
-    mp_obj_base_t base;
-    mp_int_t line;
-} extint_obj_t;
-
-STATIC uint8_t pyb_extint_mode[EXTI_NUM_VECTORS];
+//STATIC uint8_t pyb_extint_mode[EXTI_NUM_VECTORS];
 STATIC bool pyb_extint_hard_irq[EXTI_NUM_VECTORS];
 
-// The callback arg is a small-int or a ROM Pin object, so no need to scan by GC
-STATIC mp_obj_t pyb_extint_callback_arg[EXTI_NUM_VECTORS];
+ // The callback arg is a small-int or a ROM Pin object, so no need to scan by GC
+ STATIC mp_obj_t pyb_extint_callback_arg[8];
 
-#if !defined(ETH)
-#define ETH_WKUP_IRQn   62  // Some MCUs don't have ETH, but we want a value to put in our table
-#endif
-#if !defined(OTG_HS_WKUP_IRQn)
-#define OTG_HS_WKUP_IRQn 76  // Some MCUs don't have HS, but we want a value to put in our table
-#endif
-#if !defined(OTG_FS_WKUP_IRQn)
-#define OTG_FS_WKUP_IRQn 42  // Some MCUs don't have FS IRQ, but we want a value to put in our table
-#endif
 
-STATIC const uint8_t nvic_irq_channel[EXTI_NUM_VECTORS] = {
-    EXTI0_IRQn,     EXTI1_IRQn,     EXTI2_IRQn,     EXTI3_IRQn,     EXTI4_IRQn,
-    EXTI9_5_IRQn,   EXTI9_5_IRQn,   EXTI9_5_IRQn,   EXTI9_5_IRQn,   EXTI9_5_IRQn,
-    EXTI15_10_IRQn, EXTI15_10_IRQn, EXTI15_10_IRQn, EXTI15_10_IRQn, EXTI15_10_IRQn,
-    EXTI15_10_IRQn,
-    #if defined(STM32L4)
-    PVD_PVM_IRQn,
-    #else
-    PVD_IRQn,
-    #endif
-    RTC_Alarm_IRQn,
-    OTG_FS_WKUP_IRQn,
-    ETH_WKUP_IRQn,
-    OTG_HS_WKUP_IRQn,
-    TAMP_STAMP_IRQn,
-    RTC_WKUP_IRQn,
+//Struct for hadlers
+STATIC const void *int_hndls[8] = {
+
+    &GPIOA_Handler,
+    &GPIOB_Handler,
+    &GPIOC_Handler,
+    &GPIOD_Handler,
+    &GPIOE_Handler,
+    &GPIOF_Handler,
+    &GPIOG_Handler,
+    &GPIOH_Handler,
 };
 
-// Set override_callback_obj to true if you want to unconditionally set the
-// callback function.
-uint extint_register(mp_obj_t pin_obj, uint32_t mode, uint32_t pull, mp_obj_t callback_obj, bool override_callback_obj) {
+//text for printing
+STATIC const char text[8] = {
+    'A',
+    'B',
+    'C',
+    'D',
+    'E',
+    'F',
+    'G',
+    'H',
+};
+
+// // Set override_callback_obj to true if you want to unconditionally set the
+// // callback function.
+uint extint_register(extint_obj_t *self_in, mp_obj_t pin_obj, uint32_t mode, uint32_t pull, mp_obj_t callback_obj, bool override_callback_obj) {
     const pin_obj_t *pin = NULL;
-    uint v_line;
+    uint line=0;
 
     if (MP_OBJ_IS_INT(pin_obj)) {
         // If an integer is passed in, then use it to identify lines 16 thru 22
         // We expect lines 0 thru 15 to be passed in as a pin, so that we can
         // get both the port number and line number.
-        v_line = mp_obj_get_int(pin_obj);
-        if (v_line < 16) {
-            nlr_raise(mp_obj_new_exception_msg_varg(&mp_type_ValueError, "ExtInt vector %d < 16, use a Pin object", v_line));
+        line = mp_obj_get_int(pin_obj);
+        if (line < 16) {
+            nlr_raise(mp_obj_new_exception_msg_varg(&mp_type_ValueError, "ExtInt vector %d < 16, use a Pin object", line));
         }
-        if (v_line >= EXTI_NUM_VECTORS) {
-            nlr_raise(mp_obj_new_exception_msg_varg(&mp_type_ValueError, "ExtInt vector %d >= max of %d", v_line, EXTI_NUM_VECTORS));
+        if (line >= EXTI_NUM_VECTORS) {
+            nlr_raise(mp_obj_new_exception_msg_varg(&mp_type_ValueError, "ExtInt vector %d >= max of %d", line, EXTI_NUM_VECTORS));
         }
     } else {
         pin = pin_find(pin_obj);
-        v_line = pin->pin;
-    }
-    if (mode != GPIO_MODE_IT_RISING &&
-        mode != GPIO_MODE_IT_FALLING &&
-        mode != GPIO_MODE_IT_RISING_FALLING &&
-        mode != GPIO_MODE_EVT_RISING &&
-        mode != GPIO_MODE_EVT_FALLING &&
-        mode != GPIO_MODE_EVT_RISING_FALLING) {
-        nlr_raise(mp_obj_new_exception_msg_varg(&mp_type_ValueError, "invalid ExtInt Mode: %d", mode));
-    }
-    if (pull != GPIO_NOPULL &&
-        pull != GPIO_PULLUP &&
-        pull != GPIO_PULLDOWN) {
-        nlr_raise(mp_obj_new_exception_msg_varg(&mp_type_ValueError, "invalid ExtInt Pull: %d", pull));
+      // v_line = pin->gpio;
     }
 
-    mp_obj_t *cb = &MP_STATE_PORT(pyb_extint_callback)[v_line];
-    if (!override_callback_obj && *cb != mp_const_none && callback_obj != mp_const_none) {
-        nlr_raise(mp_obj_new_exception_msg_varg(&mp_type_ValueError, "ExtInt vector %d is already in use", v_line));
+    if (mode != GPIO_RISING_EDGE &&
+        mode != GPIO_FALLING_EDGE &&
+        mode != GPIO_BOTH_EDGES) 
+        {
+        nlr_raise(mp_obj_new_exception_msg_varg(&mp_type_ValueError, "invalid ExtInt Mode: %d", mode));
     }
+    self_in->gpio = pin->gpio;
+    self_in->pin_mask = pin->pin_mask;
+
+    switch (pin->gpio)
+    {
+        case GPIO_PORTA_AHB_BASE: line = GPIOA_IntHndl; break;
+        case GPIO_PORTB_AHB_BASE: line = GPIOB_IntHndl; break;
+        case GPIO_PORTC_AHB_BASE: line = GPIOC_IntHndl; break; 
+        case GPIO_PORTD_AHB_BASE: line = GPIOD_IntHndl; break;
+        case GPIO_PORTE_AHB_BASE: line = GPIOE_IntHndl; break;
+        case GPIO_PORTF_AHB_BASE: line = GPIOF_IntHndl; break;
+        case GPIO_PORTG_AHB_BASE: line = GPIOG_IntHndl; break;
+        case GPIO_PORTH_AHB_BASE: line = GPIOH_IntHndl; break;
+        case GPIO_PORTJ_AHB_BASE: line = GPIOJ_IntHndl; break;
+    }   
+
+    mp_obj_t *cb = &MP_STATE_PORT(pyb_extint_callback)[line];
+    if (*cb != mp_const_none && /*MP_OBJ_FROM_PTR(pin)*/ callback_obj != *cb/*pyb_extint_callback_arg[line]*/) {
+        nlr_raise(mp_obj_new_exception_msg_varg(&mp_type_ValueError,
+            "There is already an interrupt handler for Port %c in use", text[line]));
+    }
+    /*if (!override_callback_obj && *cb != mp_const_none && callback_obj != mp_const_none) {
+        nlr_raise(mp_obj_new_exception_msg_varg(&mp_type_ValueError, "ExtInt vector %d is already in use", v_line));
+    }*/
 
     // We need to update callback atomically, so we disable the line
     // before we update anything.
 
-    extint_disable(v_line);
+    extint_disable(pin->gpio, pin->pin_mask);
 
     *cb = callback_obj;
-    pyb_extint_mode[v_line] = (mode & 0x00010000) ? // GPIO_MODE_IT == 0x00010000
-        EXTI_Mode_Interrupt : EXTI_Mode_Event;
 
     if (*cb != mp_const_none) {
-        pyb_extint_hard_irq[v_line] = true;
-        pyb_extint_callback_arg[v_line] = MP_OBJ_NEW_SMALL_INT(v_line);
+        //pyb_extint_hard_irq[line] = true;
+        //pyb_extint_callback_arg[line] = MP_OBJ_NEW_SMALL_INT(line);
 
-        mp_hal_gpio_clock_enable(pin->gpio);
+        //Enable DEN for the Pin
+        MAP_GPIOPadConfigSet(pin->gpio, pin->pin_mask, GPIO_STRENGTH_2MA, GPIO_PIN_TYPE_OD);
+
+        pyb_extint_hard_irq[line] = false;
+        pyb_extint_callback_arg[line] = MP_OBJ_FROM_PTR(pin);
+
+      /*  mp_hal_gpio_clock_enable(pin->gpio);
         GPIO_InitTypeDef exti;
         exti.Pin = pin->pin_mask;
         exti.Mode = mode;
         exti.Pull = pull;
         exti.Speed = GPIO_SPEED_FREQ_HIGH;
-        HAL_GPIO_Init(pin->gpio, &exti);
+        HAL_GPIO_Init(pin->gpio, &exti);*/
 
-        // Calling HAL_GPIO_Init does an implicit extint_enable
+    // Register the port-level interrupt handler. This handler is the first 
+        // level interrupt handler for all the pin interrupts.
 
-        /* Enable and set NVIC Interrupt to the lowest priority */
-        NVIC_SetPriority(IRQn_NONNEG(nvic_irq_channel[v_line]), IRQ_PRI_EXTINT);
-        HAL_NVIC_EnableIRQ(nvic_irq_channel[v_line]);
+        GPIOIntRegister((uint32_t) pin->gpio, int_hndls[line]);
+
+        GPIOIntTypeSet((uint32_t) pin->gpio, pin->pin_mask, mode);
+
+        // Enable the interrupt
+        extint_enable(pin->gpio, pin->pin_mask);
     }
-    return v_line;
+    return line;
 }
 
 // This function is intended to be used by the Pin.irq() method
 void extint_register_pin(const pin_obj_t *pin, uint32_t mode, bool hard_irq, mp_obj_t callback_obj) {
-    uint32_t line = pin->pin;
+    uint32_t line = pin->pin_num;
+
+    switch (pin->gpio)
+    {
+        case GPIO_PORTA_AHB_BASE: line = GPIOA_IntHndl; break;
+        case GPIO_PORTB_AHB_BASE: line = GPIOB_IntHndl; break;
+        case GPIO_PORTC_AHB_BASE: line = GPIOC_IntHndl; break;
+        case GPIO_PORTD_AHB_BASE: line = GPIOD_IntHndl; break;
+        case GPIO_PORTE_AHB_BASE: line = GPIOE_IntHndl; break;
+        case GPIO_PORTF_AHB_BASE: line = GPIOF_IntHndl; break;
+        case GPIO_PORTG_AHB_BASE: line = GPIOG_IntHndl; break;
+        case GPIO_PORTH_AHB_BASE: line = GPIOH_IntHndl; break;
+        case GPIO_PORTJ_AHB_BASE: line = GPIOJ_IntHndl; break;
+    }   
 
     // Check if the ExtInt line is already in use by another Pin/ExtInt
-    mp_obj_t *cb = &MP_STATE_PORT(pyb_extint_callback)[line];
-    if (*cb != mp_const_none && MP_OBJ_FROM_PTR(pin) != pyb_extint_callback_arg[line]) {
-        if (MP_OBJ_IS_SMALL_INT(pyb_extint_callback_arg[line])) {
-            nlr_raise(mp_obj_new_exception_msg_varg(&mp_type_OSError,
-                "ExtInt vector %d is already in use", line));
-        } else {
+    volatile mp_obj_t *cb = &MP_STATE_PORT(pyb_extint_callback)[line];
+    if (*cb != mp_const_none && /*MP_OBJ_FROM_PTR(pin)*/ callback_obj != *cb/*pyb_extint_callback_arg[line]*/) {
+        //printf("tesing");
+       //if (MP_OBJ_IS_SMALL_INT(pyb_extint_callback_arg[line])) {
+            nlr_raise(mp_obj_new_exception_msg_varg(&mp_type_ValueError,
+               "There is already an interrupt handler for Port %c in use", text[line]));
+       /* } else {
             const pin_obj_t *other_pin = (const pin_obj_t*)pyb_extint_callback_arg[line];
-            nlr_raise(mp_obj_new_exception_msg_varg(&mp_type_OSError,
-                "IRQ resource already taken by Pin('%q')", other_pin->name));
-        }
+            nlr_raise(mp_obj_new_exception_msg_varg(&mp_type_ValueError,
+                "IRQ resource already taken by Pin('%ui')", other_pin->name));
+        }*/
     }
 
-    extint_disable(line);
+     *cb = callback_obj;
+    // pyb_extint_mode[line] = (mode & 0x00010000) ? // GPIO_MODE_IT == 0x00010000
+    //     EXTI_Mode_Interrupt : EXTI_Mode_Event;
 
-    *cb = callback_obj;
-    pyb_extint_mode[line] = (mode & 0x00010000) ? // GPIO_MODE_IT == 0x00010000
-        EXTI_Mode_Interrupt : EXTI_Mode_Event;
-
-    if (*cb != mp_const_none) {
+     if (*cb != mp_const_none) {
         // Configure and enable the callback
-
+   
         pyb_extint_hard_irq[line] = hard_irq;
         pyb_extint_callback_arg[line] = MP_OBJ_FROM_PTR(pin);
 
-        // Route the GPIO to EXTI
-        __HAL_RCC_SYSCFG_CLK_ENABLE();
-        SYSCFG->EXTICR[line >> 2] =
-            (SYSCFG->EXTICR[line >> 2] & ~(0x0f << (4 * (line & 0x03))))
-            | ((uint32_t)(GPIO_GET_INDEX(pin->gpio)) << (4 * (line & 0x03)));
+        // // Register the port-level interrupt handler. This handler is the first 
+        // level interrupt handler for all the pin interrupts.
 
-        // Enable or disable the rising detector
-        if ((mode & GPIO_MODE_IT_RISING) == GPIO_MODE_IT_RISING) {
-            EXTI_RTSR |= 1 << line;
-        } else {
-            EXTI_RTSR &= ~(1 << line);
-        }
+        GPIOIntRegister((uint32_t) pin->gpio, int_hndls[line]);
 
-        // Enable or disable the falling detector
-        if ((mode & GPIO_MODE_IT_FALLING) == GPIO_MODE_IT_FALLING) {
-            EXTI_FTSR |= 1 << line;
-        } else {
-            EXTI_FTSR &= ~(1 << line);
-        }
-
-        // Configure the NVIC
-        NVIC_SetPriority(IRQn_NONNEG(nvic_irq_channel[line]), IRQ_PRI_EXTINT);
-        HAL_NVIC_EnableIRQ(nvic_irq_channel[line]);
+        GPIOIntTypeSet((uint32_t) pin->gpio, pin->pin_mask, mode);
 
         // Enable the interrupt
-        extint_enable(line);
-    }
+        extint_enable(pin->gpio, pin->pin_mask);
+        //GPIOIntEnable((uint32_t) pin->gpio, pin->pin_mask);
+     }
 }
 
-void extint_enable(uint line) {
-    if (line >= EXTI_NUM_VECTORS) {
-        return;
-    }
-    #if defined(STM32F7) || defined(STM32H7)
-    // The Cortex-M7 doesn't have bitband support.
-    mp_uint_t irq_state = disable_irq();
-    if (pyb_extint_mode[line] == EXTI_Mode_Interrupt) {
-        #if defined(STM32H7)
-        EXTI_D1->IMR1 |= (1 << line);
-        #else
-        EXTI->IMR |= (1 << line);
-        #endif
-    } else {
-        #if defined(STM32H7)
-        EXTI_D1->EMR1 |= (1 << line);
-        #else
-        EXTI->EMR |= (1 << line);
-        #endif
-    }
-    enable_irq(irq_state);
-    #else
-    // Since manipulating IMR/EMR is a read-modify-write, and we want this to
-    // be atomic, we use the bit-band area to just affect the bit we're
-    // interested in.
-    EXTI_MODE_BB(pyb_extint_mode[line], line) = 1;
-    #endif
-}
+//enale the coresponding interrupt
+ void extint_enable(const uint32_t gpio, const uint32_t pin_mask) {
+    // Enable the interrupt
+    GPIOIntEnable((uint32_t) gpio, pin_mask);
+ }
 
-void extint_disable(uint line) {
-    if (line >= EXTI_NUM_VECTORS) {
-        return;
-    }
+//disable the corresponding interrupt
+ void extint_disable(const uint32_t gpio, const uint32_t pin_mask) {
 
-    #if defined(STM32F7) || defined(STM32H7)
-    // The Cortex-M7 doesn't have bitband support.
-    mp_uint_t irq_state = disable_irq();
-    #if defined(STM32H7)
-    EXTI_D1->IMR1 &= ~(1 << line);
-    EXTI_D1->EMR1 &= ~(1 << line);
-    #else
-    EXTI->IMR &= ~(1 << line);
-    EXTI->EMR &= ~(1 << line);
-    #endif
-    enable_irq(irq_state);
-    #else
-    // Since manipulating IMR/EMR is a read-modify-write, and we want this to
-    // be atomic, we use the bit-band area to just affect the bit we're
-    // interested in.
-    EXTI_MODE_BB(EXTI_Mode_Interrupt, line) = 0;
-    EXTI_MODE_BB(EXTI_Mode_Event, line) = 0;
-    #endif
-}
+    GPIOIntDisable((uint32_t) gpio, pin_mask);
+ }
 
+//trigger interrupt by oftware
 void extint_swint(uint line) {
     if (line >= EXTI_NUM_VECTORS) {
         return;
     }
-    // we need 0 to 1 transition to trigger the interrupt
-#if defined(STM32L4) || defined(STM32H7)
-    EXTI->SWIER1 &= ~(1 << line);
-    EXTI->SWIER1 |= (1 << line);
-#else
-    EXTI->SWIER &= ~(1 << line);
-    EXTI->SWIER |= (1 << line);
-#endif
+
+    /* Trigger Interrupt */
+    switch (line)
+    {
+        case GPIOA_IntHndl: IntTrigger(INT_GPIOA); break;
+        case GPIOB_IntHndl: IntTrigger(INT_GPIOB); break;
+        case GPIOC_IntHndl: IntTrigger(INT_GPIOC); break;
+        case GPIOD_IntHndl: IntTrigger(INT_GPIOD); break;
+        case GPIOE_IntHndl: IntTrigger(INT_GPIOE); break;
+        case GPIOF_IntHndl: IntTrigger(INT_GPIOF); break;
+        case GPIOG_IntHndl: IntTrigger(INT_GPIOG); break;
+        case GPIOH_IntHndl: IntTrigger(INT_GPIOH); break;
+        case GPIOJ_IntHndl: IntTrigger(INT_GPIOJ); break; 
+    }  
+    
 }
 
 /// \method line()
@@ -358,7 +313,7 @@ STATIC MP_DEFINE_CONST_FUN_OBJ_1(extint_obj_line_obj, extint_obj_line);
 /// Enable a disabled interrupt.
 STATIC mp_obj_t extint_obj_enable(mp_obj_t self_in) {
     extint_obj_t *self = self_in;
-    extint_enable(self->line);
+    extint_enable(self->gpio, self->pin_mask);
     return mp_const_none;
 }
 STATIC MP_DEFINE_CONST_FUN_OBJ_1(extint_obj_enable_obj, extint_obj_enable);
@@ -368,7 +323,7 @@ STATIC MP_DEFINE_CONST_FUN_OBJ_1(extint_obj_enable_obj, extint_obj_enable);
 /// This could be useful for debouncing.
 STATIC mp_obj_t extint_obj_disable(mp_obj_t self_in) {
     extint_obj_t *self = self_in;
-    extint_disable(self->line);
+    extint_disable(self->gpio, self->pin_mask);
     return mp_const_none;
 }
 STATIC MP_DEFINE_CONST_FUN_OBJ_1(extint_obj_disable_obj, extint_obj_disable);
@@ -381,55 +336,6 @@ STATIC mp_obj_t extint_obj_swint(mp_obj_t self_in) {
     return mp_const_none;
 }
 STATIC MP_DEFINE_CONST_FUN_OBJ_1(extint_obj_swint_obj,  extint_obj_swint);
-
-// TODO document as a staticmethod
-/// \classmethod regs()
-/// Dump the values of the EXTI registers.
-STATIC mp_obj_t extint_regs(void) {
-    #if defined(STM32L4)
-    printf("EXTI_IMR1   %08x\n", (unsigned int)EXTI->IMR1);
-    printf("EXTI_IMR2   %08x\n", (unsigned int)EXTI->IMR2);
-    printf("EXTI_EMR1   %08x\n", (unsigned int)EXTI->EMR1);
-    printf("EXTI_EMR2   %08x\n", (unsigned int)EXTI->EMR2);
-    printf("EXTI_RTSR1  %08x\n", (unsigned int)EXTI->RTSR1);
-    printf("EXTI_RTSR2  %08x\n", (unsigned int)EXTI->RTSR2);
-    printf("EXTI_FTSR1  %08x\n", (unsigned int)EXTI->FTSR1);
-    printf("EXTI_FTSR2  %08x\n", (unsigned int)EXTI->FTSR2);
-    printf("EXTI_SWIER1 %08x\n", (unsigned int)EXTI->SWIER1);
-    printf("EXTI_SWIER2 %08x\n", (unsigned int)EXTI->SWIER2);
-    printf("EXTI_PR1    %08x\n", (unsigned int)EXTI->PR1);
-    printf("EXTI_PR2    %08x\n", (unsigned int)EXTI->PR2);
-    #elif defined(STM32H7)
-    printf("EXTI_IMR1   %08x\n", (unsigned int)EXTI_D1->IMR1);
-    printf("EXTI_IMR2   %08x\n", (unsigned int)EXTI_D1->IMR2);
-    printf("EXTI_IMR3   %08x\n", (unsigned int)EXTI_D1->IMR3);
-    printf("EXTI_EMR1   %08x\n", (unsigned int)EXTI_D1->EMR1);
-    printf("EXTI_EMR2   %08x\n", (unsigned int)EXTI_D1->EMR2);
-    printf("EXTI_EMR3   %08x\n", (unsigned int)EXTI_D1->EMR3);
-    printf("EXTI_RTSR1  %08x\n", (unsigned int)EXTI->RTSR1);
-    printf("EXTI_RTSR2  %08x\n", (unsigned int)EXTI->RTSR2);
-    printf("EXTI_RTSR3  %08x\n", (unsigned int)EXTI->RTSR3);
-    printf("EXTI_FTSR1  %08x\n", (unsigned int)EXTI->FTSR1);
-    printf("EXTI_FTSR2  %08x\n", (unsigned int)EXTI->FTSR2);
-    printf("EXTI_FTSR3  %08x\n", (unsigned int)EXTI->FTSR3);
-    printf("EXTI_SWIER1 %08x\n", (unsigned int)EXTI->SWIER1);
-    printf("EXTI_SWIER2 %08x\n", (unsigned int)EXTI->SWIER2);
-    printf("EXTI_SWIER3 %08x\n", (unsigned int)EXTI->SWIER3);
-    printf("EXTI_PR1    %08x\n", (unsigned int)EXTI_D1->PR1);
-    printf("EXTI_PR2    %08x\n", (unsigned int)EXTI_D1->PR2);
-    printf("EXTI_PR3    %08x\n", (unsigned int)EXTI_D1->PR3);
-    #else
-    printf("EXTI_IMR   %08x\n", (unsigned int)EXTI->IMR);
-    printf("EXTI_EMR   %08x\n", (unsigned int)EXTI->EMR);
-    printf("EXTI_RTSR  %08x\n", (unsigned int)EXTI->RTSR);
-    printf("EXTI_FTSR  %08x\n", (unsigned int)EXTI->FTSR);
-    printf("EXTI_SWIER %08x\n", (unsigned int)EXTI->SWIER);
-    printf("EXTI_PR    %08x\n", (unsigned int)EXTI->PR);
-    #endif
-    return mp_const_none;
-}
-STATIC MP_DEFINE_CONST_FUN_OBJ_0(extint_regs_fun_obj, extint_regs);
-STATIC MP_DEFINE_CONST_STATICMETHOD_OBJ(extint_regs_obj, (mp_obj_t)&extint_regs_fun_obj);
 
 /// \classmethod \constructor(pin, mode, pull, callback)
 /// Create an ExtInt object:
@@ -449,7 +355,7 @@ STATIC MP_DEFINE_CONST_STATICMETHOD_OBJ(extint_regs_obj, (mp_obj_t)&extint_regs_
 STATIC const mp_arg_t pyb_extint_make_new_args[] = {
     { MP_QSTR_pin,      MP_ARG_REQUIRED | MP_ARG_OBJ, {.u_obj = MP_OBJ_NULL} },
     { MP_QSTR_mode,     MP_ARG_REQUIRED | MP_ARG_INT, {.u_int = 0} },
-    { MP_QSTR_pull,     MP_ARG_REQUIRED | MP_ARG_INT, {.u_int = 0} },
+   // { MP_QSTR_pull,     MP_ARG_REQUIRED | MP_ARG_INT, {.u_int = 0} },
     { MP_QSTR_callback, MP_ARG_REQUIRED | MP_ARG_OBJ, {.u_obj = MP_OBJ_NULL} },
 };
 #define PYB_EXTINT_MAKE_NEW_NUM_ARGS MP_ARRAY_SIZE(pyb_extint_make_new_args)
@@ -463,7 +369,7 @@ STATIC mp_obj_t extint_make_new(const mp_obj_type_t *type, size_t n_args, size_t
 
     extint_obj_t *self = m_new_obj(extint_obj_t);
     self->base.type = type;
-    self->line = extint_register(vals[0].u_obj, vals[1].u_int, vals[2].u_int, vals[3].u_obj, false);
+    self->line = extint_register(self, vals[0].u_obj, vals[1].u_int, vals[2].u_int, vals[2].u_obj, false);
 
     return self;
 }
@@ -478,19 +384,15 @@ STATIC const mp_rom_map_elem_t extint_locals_dict_table[] = {
     { MP_ROM_QSTR(MP_QSTR_enable),  MP_ROM_PTR(&extint_obj_enable_obj) },
     { MP_ROM_QSTR(MP_QSTR_disable), MP_ROM_PTR(&extint_obj_disable_obj) },
     { MP_ROM_QSTR(MP_QSTR_swint),   MP_ROM_PTR(&extint_obj_swint_obj) },
-    { MP_ROM_QSTR(MP_QSTR_regs),    MP_ROM_PTR(&extint_regs_obj) },
+   // { MP_ROM_QSTR(MP_QSTR_regs),    MP_ROM_PTR(&extint_regs_obj) },
 
     // class constants
     /// \constant IRQ_RISING - interrupt on a rising edge
     /// \constant IRQ_FALLING - interrupt on a falling edge
     /// \constant IRQ_RISING_FALLING - interrupt on a rising or falling edge
-    { MP_ROM_QSTR(MP_QSTR_IRQ_RISING),         MP_ROM_INT(GPIO_MODE_IT_RISING) },
-    { MP_ROM_QSTR(MP_QSTR_IRQ_FALLING),        MP_ROM_INT(GPIO_MODE_IT_FALLING) },
-    { MP_ROM_QSTR(MP_QSTR_IRQ_RISING_FALLING), MP_ROM_INT(GPIO_MODE_IT_RISING_FALLING) },
-    { MP_ROM_QSTR(MP_QSTR_EVT_RISING),         MP_ROM_INT(GPIO_MODE_EVT_RISING) },
-    { MP_ROM_QSTR(MP_QSTR_EVT_FALLING),        MP_ROM_INT(GPIO_MODE_EVT_FALLING) },
-    { MP_ROM_QSTR(MP_QSTR_EVT_RISING_FALLING), MP_ROM_INT(GPIO_MODE_EVT_RISING_FALLING) },
-};
+    { MP_ROM_QSTR(MP_QSTR_IRQ_RISING),         MP_ROM_INT(GPIO_RISING_EDGE) },
+    { MP_ROM_QSTR(MP_QSTR_IRQ_FALLING),        MP_ROM_INT(GPIO_FALLING_EDGE) },
+    { MP_ROM_QSTR(MP_QSTR_IRQ_RISING_FALLING), MP_ROM_INT(GPIO_BOTH_EDGES) },};
 
 STATIC MP_DEFINE_CONST_DICT(extint_locals_dict, extint_locals_dict_table);
 
@@ -505,24 +407,15 @@ const mp_obj_type_t extint_type = {
 void extint_init0(void) {
     for (int i = 0; i < PYB_EXTI_NUM_VECTORS; i++) {
         MP_STATE_PORT(pyb_extint_callback)[i] = mp_const_none;
-        pyb_extint_mode[i] = EXTI_Mode_Interrupt;
+        //pyb_extint_mode[i] = EXTI_Mode_Interrupt;
    }
 }
 
-// Interrupt handler
+//Interrupt handler
 void Handle_EXTI_Irq(uint32_t line) {
-    if (__HAL_GPIO_EXTI_GET_FLAG(1 << line)) {
-        __HAL_GPIO_EXTI_CLEAR_FLAG(1 << line);
         if (line < EXTI_NUM_VECTORS) {
             mp_obj_t *cb = &MP_STATE_PORT(pyb_extint_callback)[line];
             if (*cb != mp_const_none) {
-                // If it's a soft IRQ handler then just schedule callback for later
-                if (!pyb_extint_hard_irq[line]) {
-                    mp_sched_schedule(*cb, pyb_extint_callback_arg[line]);
-                    return;
-                }
-
-                mp_sched_lock();
                 // When executing code within a handler we must lock the GC to prevent
                 // any memory allocations.  We must also catch any exceptions.
                 gc_lock();
@@ -533,13 +426,11 @@ void Handle_EXTI_Irq(uint32_t line) {
                 } else {
                     // Uncaught exception; disable the callback so it doesn't run again.
                     *cb = mp_const_none;
-                    extint_disable(line);
+                    //extint_disable(line);
                     printf("Uncaught exception in ExtInt interrupt handler line %u\n", (unsigned int)line);
                     mp_obj_print_exception(&mp_plat_print, (mp_obj_t)nlr.ret_val);
                 }
                 gc_unlock();
-                mp_sched_unlock();
             }
         }
-    }
 }

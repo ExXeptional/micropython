@@ -34,7 +34,9 @@
 #include "extmod/virtpin.h"
 
 #include <pin.h>
-//#include "extint.h"
+
+#include <extint.h>
+#include "extint.h"
 #include "inc/hw_gpio.h"
 #include "inc/hw_ints.h"
 #include "driverlib/gpio.h"
@@ -446,22 +448,22 @@ STATIC MP_DEFINE_CONST_FUN_OBJ_1(pin_on_obj, pin_on);
 // pin.irq(handler=None, trigger=IRQ_RISING, hard=False)
 // TODO
 STATIC mp_obj_t pin_irq(size_t n_args, const mp_obj_t *pos_args, mp_map_t *kw_args) {
-//    enum { ARG_handler, ARG_trigger, ARG_hard };
-//    static const mp_arg_t allowed_args[] = {
-//        { MP_QSTR_handler, MP_ARG_OBJ, {.u_rom_obj = MP_ROM_PTR(&mp_const_none_obj)} },
-//        { MP_QSTR_trigger, MP_ARG_INT, {.u_int = GPIO_RISING_EDGE} },
-//        { MP_QSTR_hard, MP_ARG_BOOL, {.u_bool = false} },
-//    };
-//    pin_obj_t *self = MP_OBJ_TO_PTR(pos_args[0]);
-//    mp_arg_val_t args[MP_ARRAY_SIZE(allowed_args)];
-//    mp_arg_parse_all(n_args - 1, pos_args + 1, kw_args, MP_ARRAY_SIZE(allowed_args), allowed_args, args);
-//
-//    if (n_args > 1 || kw_args->used != 0) {
-//        // configure irq
-//        extint_register_pin(self, args[ARG_trigger].u_int,
-//            args[ARG_hard].u_bool, args[ARG_handler].u_obj);
-//    }
-//
+   enum { ARG_handler, ARG_trigger, ARG_hard };
+   static const mp_arg_t allowed_args[] = {
+       { MP_QSTR_handler, MP_ARG_OBJ, {.u_rom_obj = MP_ROM_PTR(&mp_const_none_obj)} },
+       { MP_QSTR_trigger, MP_ARG_INT, {.u_int = GPIO_RISING_EDGE | GPIO_FALLING_EDGE} },
+       { MP_QSTR_hard, MP_ARG_BOOL, {.u_bool = false} },
+   };
+   pin_obj_t *self = MP_OBJ_TO_PTR(pos_args[0]);
+   mp_arg_val_t args[MP_ARRAY_SIZE(allowed_args)];
+   mp_arg_parse_all(n_args - 1, pos_args + 1, kw_args, MP_ARRAY_SIZE(allowed_args), allowed_args, args);
+
+   if (n_args > 1 || kw_args->used != 0) {
+       // configure irq
+       extint_register_pin(self, args[ARG_trigger].u_int,
+           args[ARG_hard].u_bool, args[ARG_handler].u_obj);
+   }
+
 //    // TODO should return an IRQ object
     return mp_const_none;
 }

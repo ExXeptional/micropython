@@ -139,12 +139,14 @@
 
 #define MP_HAL_UNIQUE_ID_ADDRESS (0x1fff7590)
 #define PYB_EXTI_NUM_VECTORS (23)
-#define MICROPY_HW_MAX_TIMER (17)
+#define MICROPY_HW_MAX_TIMER (12)
 #define MICROPY_HW_MAX_UART (6)
 
 #else
 #error Unsupported MCU series
 #endif
+
+#define MICROPY_HW_MAX_TIMER (12)
 
 // Configure HSE for bypass or oscillator
 #if MICROPY_HW_CLK_USE_BYPASS

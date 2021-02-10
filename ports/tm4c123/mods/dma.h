@@ -29,58 +29,41 @@
 
 typedef struct _dma_descr_t dma_descr_t;
 
-#if defined(STM32F4) || defined(STM32F7) || defined(STM32H7)
-
-extern const dma_descr_t dma_I2C_1_RX;
-extern const dma_descr_t dma_SPI_3_RX;
-extern const dma_descr_t dma_I2C_4_RX;
-extern const dma_descr_t dma_I2C_3_RX;
-extern const dma_descr_t dma_I2C_2_RX;
-extern const dma_descr_t dma_SPI_2_RX;
-extern const dma_descr_t dma_SPI_2_TX;
-extern const dma_descr_t dma_I2C_3_TX;
-extern const dma_descr_t dma_I2C_4_TX;
-extern const dma_descr_t dma_DAC_1_TX;
-extern const dma_descr_t dma_DAC_2_TX;
-extern const dma_descr_t dma_SPI_3_TX;
-extern const dma_descr_t dma_I2C_1_TX;
-extern const dma_descr_t dma_I2C_2_TX;
-extern const dma_descr_t dma_SDMMC_2_RX;
-extern const dma_descr_t dma_SPI_1_RX;
-extern const dma_descr_t dma_SPI_5_RX;
-extern const dma_descr_t dma_SDIO_0_RX;
-extern const dma_descr_t dma_SPI_4_RX;
-extern const dma_descr_t dma_SPI_5_TX;
-extern const dma_descr_t dma_SPI_4_TX;
-extern const dma_descr_t dma_SPI_6_TX;
-extern const dma_descr_t dma_SPI_1_TX;
-extern const dma_descr_t dma_SDMMC_2_TX;
-extern const dma_descr_t dma_SPI_6_RX;
-extern const dma_descr_t dma_SDIO_0_TX;
-
-#elif defined(STM32L4)
-
-extern const dma_descr_t dma_ADC_1_RX;
-extern const dma_descr_t dma_ADC_2_RX;
-extern const dma_descr_t dma_SPI_1_RX;
-extern const dma_descr_t dma_I2C_3_TX;
-extern const dma_descr_t dma_ADC_3_RX;
-extern const dma_descr_t dma_SPI_1_TX;
-extern const dma_descr_t dma_I2C_3_RX;
-extern const dma_descr_t dma_DAC_1_TX;
-extern const dma_descr_t dma_SPI_2_RX;
-extern const dma_descr_t dma_I2C_2_TX;
-extern const dma_descr_t dma_DAC_2_TX;
-extern const dma_descr_t dma_SPI_2_TX;
-extern const dma_descr_t dma_I2C_2_RX;
-extern const dma_descr_t dma_I2C_1_TX;
-extern const dma_descr_t dma_I2C_1_RX;
-extern const dma_descr_t dma_SPI_3_RX;
-extern const dma_descr_t dma_SPI_3_TX;
-extern const dma_descr_t dma_SDIO_0_TX;
-extern const dma_descr_t dma_SDIO_0_RX;
-
-#endif
+typedef enum {
+    dma_id_not_defined=-1,
+    dma_id_0,
+    dma_id_1,
+    dma_id_2,
+    dma_id_3,
+    dma_id_4,
+    dma_id_5,
+    dma_id_6,
+    dma_id_7,
+    dma_id_8,
+    dma_id_9,
+    dma_id_10,
+    dma_id_11,
+    dma_id_12,
+    dma_id_13,
+    dma_id_14,
+    dma_id_15,
+    dma_id_16,
+    dma_id_17,
+    dma_id_18,
+    dma_id_19,
+    dma_id_20,
+    dma_id_21,
+    dma_id_22,
+    dma_id_23,
+    dma_id_24,
+    dma_id_25,
+    dma_id_26,
+    dma_id_27,
+    dma_id_28,
+    dma_id_29,
+    dma_id_30,
+    dma_id_31,
+} dma_id_t;
 
 typedef union {
     uint16_t    enabled;    // Used to test if both counters are == 0
@@ -94,11 +77,20 @@ extern volatile dma_idle_count_t dma_idle;
 #define DMA_IDLE_TICK_MAX           (8)     // 128 msec
 #define DMA_IDLE_TICK(tick)         (((tick) & DMA_SYSTICK_MASK) == 0)
 
+typedef enum{
+    DMA_CHANNEL_RX = 0,
+    DMA_CHANNEL_TX = 1
+} DMA_Channel_Dir;
 
-void dma_init(DMA_HandleTypeDef *dma, const dma_descr_t *dma_descr, void *data);
-void dma_init_handle(DMA_HandleTypeDef *dma, const dma_descr_t *dma_descr, void *data);
+
+//void dma_init(DMA_HandleTypeDef *dma, const dma_descr_t *dma_descr, void *data);
+void dma_init(uint32_t ui32ChannelStructIndex, DMA_Channel_Dir ui8ChnDir);
+//void dma_init_handle(DMA_HandleTypeDef *dma, const dma_descr_t *dma_descr, void *data);
 void dma_deinit(const dma_descr_t *dma_descr);
 void dma_invalidate_channel(const dma_descr_t *dma_descr);
 void dma_idle_handler(int controller);
+void dma_hw_init();
+void spi_dma_rx(uint32_t ui32ChannelStructIndex, const uint8_t *pvSrcAddr, uint16_t *pvDstAddr, size_t bits, size_t len);
+void spi_dma_tx(uint32_t ui32ChannelStructIndex, const uint16_t *pvSrcAddr, uint8_t *pvDstAddr, size_t bits, size_t len);
 
 #endif // MICROPY_INCLUDED_STM32_DMA_H

@@ -52,13 +52,33 @@
 #define EXTI_TRIGGER_FALLING        (offsetof(EXTI_TypeDef, FTSR))
 #define EXTI_TRIGGER_RISING_FALLING (EXTI_TRIGGER_RISING + EXTI_TRIGGER_FALLING)  // just different from RISING or FALLING
 
+
+ enum GPIO_IntHndl {
+    GPIOA_IntHndl,
+    GPIOB_IntHndl,
+    GPIOC_IntHndl,
+    GPIOD_IntHndl,
+    GPIOE_IntHndl,
+    GPIOF_IntHndl,
+    GPIOG_IntHndl,
+    GPIOH_IntHndl,
+    GPIOJ_IntHndl,
+};
+
+typedef struct {
+    mp_obj_base_t base;
+    mp_int_t line;
+    uint32_t      pin_mask;
+    uint32_t      gpio;   //Address of Port
+} extint_obj_t;
+
 void extint_init0(void);
 
-uint extint_register(mp_obj_t pin_obj, uint32_t mode, uint32_t pull, mp_obj_t callback_obj, bool override_callback_obj);
+uint extint_register(extint_obj_t *self_in, mp_obj_t pin_obj, uint32_t mode, uint32_t pull, mp_obj_t callback_obj, bool override_callback_obj);
 void extint_register_pin(const pin_obj_t *pin, uint32_t mode, bool hard_irq, mp_obj_t callback_obj);
 
-void extint_enable(uint line);
-void extint_disable(uint line);
+ void extint_enable(const uint32_t gpio, const uint32_t pin_mask);
+ void extint_disable(const uint32_t gpio, const uint32_t pin_mask); 
 void extint_swint(uint line);
 
 void Handle_EXTI_Irq(uint32_t line);

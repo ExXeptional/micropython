@@ -90,6 +90,8 @@
 // #include "dma.h"
 // #include "i2c.h"
 #include "usb.h"
+#include "inc/hw_memmap.h"
+#include "extint.h"
 
 extern void __fatal_error(const char*);
 // extern PCD_HandleTypeDef pcd_fs_handle;
@@ -467,6 +469,72 @@ void FLASH_IRQHandler(void) {
     // storage_irq_handler();
     IRQ_EXIT(FLASH_IRQn);
 }
+
+
+void GPIOA_Handler(void)
+{
+    volatile u_int32_t intStat = 0;
+    intStat = GPIOIntStatus(GPIO_PORTA_AHB_BASE, false);
+    GPIOIntClear(GPIO_PORTA_AHB_BASE, intStat);
+    Handle_EXTI_Irq(GPIOA_IntHndl);
+}
+
+void GPIOB_Handler(void)
+{
+    volatile u_int32_t intStat = 0;
+    intStat = GPIOIntStatus(GPIO_PORTB_AHB_BASE, false);
+    GPIOIntClear(GPIO_PORTB_AHB_BASE, intStat);
+    Handle_EXTI_Irq(GPIOB_IntHndl);
+}
+
+void GPIOC_Handler(void)
+{
+    volatile u_int32_t intStat = 0;
+    intStat = GPIOIntStatus(GPIO_PORTC_AHB_BASE, false);
+    GPIOIntClear(GPIO_PORTC_AHB_BASE, intStat);
+    Handle_EXTI_Irq(GPIOC_IntHndl);
+}
+
+void GPIOD_Handler(void)
+{
+    volatile u_int32_t intStat = 0;
+    intStat = GPIOIntStatus(GPIO_PORTD_AHB_BASE, false);
+    GPIOIntClear(GPIO_PORTD_AHB_BASE, intStat);
+    Handle_EXTI_Irq(GPIOD_IntHndl);
+}
+
+void GPIOE_Handler(void)
+{
+    volatile u_int32_t intStat = 0;
+    intStat = GPIOIntStatus(GPIO_PORTE_AHB_BASE, false);
+    GPIOIntClear(GPIO_PORTE_AHB_BASE, intStat);
+    Handle_EXTI_Irq(GPIOE_IntHndl);
+}
+
+void GPIOF_Handler(void)
+{
+    volatile u_int32_t intStat = 0;
+    intStat = GPIOIntStatus(GPIO_PORTF_AHB_BASE, false);
+    GPIOIntClear(GPIO_PORTF_AHB_BASE, intStat);
+    Handle_EXTI_Irq(GPIOF_IntHndl);
+}
+
+void GPIOG_Handler(void)
+{
+    volatile u_int32_t intStat = 0;
+    intStat = GPIOIntStatus(GPIO_PORTG_AHB_BASE, false);
+    GPIOIntClear(GPIO_PORTG_AHB_BASE, intStat);
+    Handle_EXTI_Irq(GPIOG_IntHndl);
+}
+
+void GPIOH_Handler(void)
+{
+    volatile u_int32_t intStat = 0;
+    intStat = GPIOIntStatus(GPIO_PORTH_AHB_BASE, false);
+    GPIOIntClear(GPIO_PORTH_AHB_BASE, intStat);
+    Handle_EXTI_Irq(GPIOH_IntHndl);
+}
+
 #ifdef MOREINTS
 /**
   * @brief  These functions handle the EXTI interrupt requests.

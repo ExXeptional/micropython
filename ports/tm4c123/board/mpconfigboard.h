@@ -29,8 +29,8 @@
 
 #define SYS_TICK_DIVIDER            (1000)
 
-// assumption: every GPIO is interrupt capable
-#define PYB_EXTI_NUM_VECTORS (78)
+// assumption: every GPIO Port is interrupt capable
+#define PYB_EXTI_NUM_VECTORS (8)
 
 #define MICROPY_HW_MAX_UART (8)
 #define MICROPY_HW_MAX_SPI (4)

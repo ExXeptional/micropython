@@ -15,7 +15,7 @@ LINK_TIME_OPT = 1
 
 # Location of the TivaWare library
 # Can be pointed to a newer version if desired
-TIVAWARE_LIB = /mnt/c/ti/TivaWare
+TIVAWARE_LIB = /Users/svenglueck/ti/tivaware_c_series_2_1_4_178 #/mnt/c/ti/TivaWare
 #TIVAWARE_LIB = /home/raphael/ti/tivaware
 
 # Name of the Project (and the resulting binary file)
@@ -68,7 +68,7 @@ INC += -I$(TOP)
 INC += -I$(BUILD)
 INC += -I$(BUILD)/genhdr
 INC += -I$(TIVAWARE_LIB)
-INC += -I$(TIVAWARE_LIB)/driverlib
+INC += -I/Users/svenglueck/ti/tivaware_c_series_2_1_4_178/driverlib #$(TIVAWARE_LIB)/driverlib
 INC += -I$(PY_SRC)
 INC += -I./board
 INC += -I../../
@@ -142,7 +142,7 @@ LD = $(CC)
 LDFLAGS = -Wl,-nostdlib,-T,$(LINKER_FILE),-Map=$(@:.axf=.map),--cref,--gc-sections $(CFLAGS)
 
 # Libraries
-LIBS = $(TIVAWARE_LIB)/driverlib/gcc/libdriver.a
+LIBS = /Users/svenglueck/ti/tivaware_c_series_2_1_4_178/driverlib/gcc/libdriver.a #$(TIVAWARE_LIB)/driverlib/gcc/libdriver.a
 LIBGCC := ${shell $(CC) $(CFLAGS) --print-libgcc-file-name}
 LIBC := ${shell ${CC} ${CFLAGS} --print-file-name=libc.a}
 LIBM := ${shell ${CC} ${CFLAGS} --print-file-name=libm.a}
@@ -195,6 +195,8 @@ MODS_SRC_C = $(addprefix mods/,\
 	modutime.c \
 	irq.c \
 	mpthreadport.c \
+	dma.c \
+	extint.c \
 )
 	# fatfs_port.c \
 	# irq.c \
@@ -344,7 +346,7 @@ ${PROJECT_NAME}.axf: $(OBJ)
 	$(ECHO) Used these C-Flags: $(CFLAGS) 
 	$(ECHO)
 	$(ECHO) Making driverlib
-	$(Q)$(MAKE) -C ${TIVAWARE_LIB}/driverlib/
+	$(Q)$(MAKE) -C /Users/svenglueck/ti/tivaware_c_series_2_1_4_178/driverlib/ #${TIVAWARE_LIB}/driverlib/
 	$(ECHO)
 	$(ECHO) Linking...
 	$(ECHO) " >" ${PROJECT_NAME}.axf

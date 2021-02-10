@@ -79,4 +79,14 @@ void SysTick_Handler(void);
 void OTG_FS_IRQHandler(void);
 void OTG_HS_IRQHandler(void);
 
+/*GPIO Port handlers*/
+void GPIOA_Handler(void);
+void GPIOB_Handler(void);
+void GPIOC_Handler(void);
+void GPIOD_Handler(void);
+void GPIOE_Handler(void);
+void GPIOF_Handler(void);
+void GPIOG_Handler(void);
+void GPIOH_Handler(void);
+
 #endif // MICROPY_INCLUDED_STM32_STM32_IT_H

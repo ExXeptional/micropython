@@ -35,6 +35,7 @@
 #include "pin.h"
 #include "bufhelper.h"
 #include "spi.h"
+#include "dma.h"
 
 #include "driverlib/ssi.h"
 #include "inc/hw_ssi.h"
@@ -204,6 +205,8 @@ void spi_init(const mp_obj_t *self_in) {
         self->regs = (periph_spi_t*)SSI0_BASE;
         self->irqn = INT_SSI0;
         pins[0] = MICROPY_HW_SPI0_SCK;
+        self->dma_channel_rx = dma_id_10;
+        self->dma_channel_tx = dma_id_11;
         #if defined(MICROPY_HW_SPI0_MISO)
         pins[1] = MICROPY_HW_SPI0_MISO;
         #endif
@@ -222,6 +225,8 @@ void spi_init(const mp_obj_t *self_in) {
         self->periph = SYSCTL_PERIPH_SSI1;
         self->regs = (periph_spi_t*)SSI1_BASE;
         self->irqn = INT_SSI1;
+        self->dma_channel_rx = dma_id_10;
+        self->dma_channel_tx = dma_id_11;
         pins[0] = MICROPY_HW_SPI1_SCK;
         #if defined(MICROPY_HW_SPI1_MISO)
         pins[1] = MICROPY_HW_SPI1_MISO;
@@ -241,6 +246,8 @@ void spi_init(const mp_obj_t *self_in) {
         self->periph = SYSCTL_PERIPH_SSI2;
         self->regs = (periph_spi_t*)SSI2_BASE;
         self->irqn = INT_SSI2;
+        self->dma_channel_rx = dma_id_12;
+        self->dma_channel_tx = dma_id_13;
         pins[0] = MICROPY_HW_SPI2_SCK;
         #if defined(MICROPY_HW_SPI2_MISO)
         pins[1] = MICROPY_HW_SPI2_MISO;
@@ -260,6 +267,8 @@ void spi_init(const mp_obj_t *self_in) {
         self->periph = SYSCTL_PERIPH_SSI3;
         self->regs = (periph_spi_t*)SSI3_BASE;
         self->irqn = INT_SSI3;
+        self->dma_channel_rx = dma_id_14;
+        self->dma_channel_tx = dma_id_15;
         pins[0] = MICROPY_HW_SPI3_SCK;
         #if defined(MICROPY_HW_SPI3_MISO)
         pins[1] = MICROPY_HW_SPI3_MISO;
@@ -297,8 +306,26 @@ void spi_init(const mp_obj_t *self_in) {
     
     SSIClockSourceSet(self->spi_base, SSI_CLOCK_SYSTEM);
     SSIConfigSetExpClk(self->spi_base, MAP_SysCtlClockGet(), self->protocol, self->mode, self->baudrate, self->bits);
+    
+
+    if(self->dma_enabled == SSI_DMA_RX)
+    {
+        dma_init(self->dma_channel_rx, DMA_CHANNEL_RX);
+    }
+    else if (self->dma_enabled == SSI_DMA_TX)
+    {
+        dma_init(self->dma_channel_tx, DMA_CHANNEL_TX);
+    }
+    else if (self->dma_enabled == (SSI_DMA_TX | SSI_DMA_RX))
+    {
+        /* code */
+        dma_init(self->dma_channel_tx, DMA_CHANNEL_TX);
+        dma_init(self->dma_channel_rx, DMA_CHANNEL_RX);
+    }
+
     SSIDMADisable(self->spi_base, SSI_DMA_TX | SSI_DMA_RX);
     SSIDMAEnable(self->spi_base, self->dma_enabled);
+    
 
     SSIEnable(self->spi_base);
 }
@@ -357,110 +384,145 @@ STATIC bool spi_wait_flag_unset(machine_hard_spi_obj_t *self, uint32_t flag, uin
     }
 }
 
-mp_uint_t spi_tx_only(machine_hard_spi_obj_t *self, const uint8_t* data, size_t len, uint32_t word_timeout, int *errcode) {
+mp_uint_t spi_tx_only(machine_hard_spi_obj_t *self, const uint16_t* data, size_t len, uint32_t word_timeout, int *errcode) {
     uint num_tx = 0;
     uint32_t dummy;
     volatile uint32_t dat;
-    while(num_tx < len) {
 
-        if(!spi_tx_wait(self, word_timeout)) {
+    /* when dmaa is enabled for trnsmitt */
+    if(self->dma_enabled == SSI_DMA_TX)
+    {
+        spi_dma_tx(self->dma_channel_tx, data,(uint8_t*) (self->spi_base + SSI_O_DR), self->bits,len);
+        return len;
+    }
+    else {
+        while(num_tx < len) {
+
+            if(!spi_tx_wait(self, word_timeout)) {
+                *errcode = MP_ETIMEDOUT;
+                return num_tx;
+            }
+            // Reversing bit order of data
+            if(self->lsb_first) {
+                asm volatile("rbit %1,%0" : "=r" (dat) : "r" (data[num_tx]));
+                dat >>= (32 - self->bits);
+                //nop here?
+                SSIDataPutNonBlocking(self->spi_base, dat);
+            } else {
+                SSIDataPutNonBlocking(self->spi_base, data[num_tx]);
+            }   
+            SSIDataGetNonBlocking(self->spi_base, &dummy);
+            num_tx++;
+        }
+
+        if(!spi_wait_flag_unset(self, SSI_SR_BSY, word_timeout)) {
             *errcode = MP_ETIMEDOUT;
             return num_tx;
         }
-        // Reversing bit order of data
-        if(self->lsb_first) {
-            asm volatile("rbit %1,%0" : "=r" (dat) : "r" (data[num_tx]));
-            dat >>= (32 - self->bits);
-            //nop here?
-            SSIDataPutNonBlocking(self->spi_base, dat);
-        } else {
-            SSIDataPutNonBlocking(self->spi_base, data[num_tx]);
-        }   
-        SSIDataGetNonBlocking(self->spi_base, &dummy);
-        num_tx++;
-    }
 
-    if(!spi_wait_flag_unset(self, SSI_SR_BSY, word_timeout)) {
-        *errcode = MP_ETIMEDOUT;
+        *errcode = 0;
         return num_tx;
     }
-
-    *errcode = 0;
-    return num_tx;
 }
 
-mp_uint_t spi_rx_only(machine_hard_spi_obj_t *self, uint8_t* data, size_t len, uint32_t word_timeout, int *errcode) {
+mp_uint_t spi_rx_only(machine_hard_spi_obj_t *self, uint16_t* data, size_t len, uint32_t word_timeout, int *errcode) {
     uint num_rx = 0;
     uint32_t dummy = 0;
     uint32_t dumm;
-    while(num_rx < len) {
 
-        if(!spi_rx_wait(self, word_timeout)) {
+        /* when dmaa is enabled for receive */
+    if(self->dma_enabled == SSI_DMA_RX)
+    {
+        spi_dma_rx(self->dma_channel_rx,(uint8_t*) (self->spi_base + SSI_O_DR), data, self->bits,len);
+        return len;
+    }
+    else{
+        while(num_rx < len) {
+
+            if(!spi_rx_wait(self, word_timeout)) {
+                *errcode = MP_ETIMEDOUT;
+                return num_rx;
+            }
+
+            SSIDataPutNonBlocking(self->spi_base, dummy);
+            num_rx += SSIDataGetNonBlocking(self->spi_base, &dumm);
+            // Reversing bit order of data
+            if(self->lsb_first) {
+                asm volatile("rbit %1,%0" : "=r" (dumm) : "r" (dumm));
+                dumm >>= (32 - self->bits);
+                //nop here?
+            }
+            data[num_rx] = dumm;
+        }
+
+        if(!spi_wait_flag_unset(self, SSI_SR_BSY, word_timeout)) {
             *errcode = MP_ETIMEDOUT;
             return num_rx;
         }
 
-        SSIDataPutNonBlocking(self->spi_base, dummy);
-        num_rx += SSIDataGetNonBlocking(self->spi_base, &dumm);
-        // Reversing bit order of data
-        if(self->lsb_first) {
-            asm volatile("rbit %1,%0" : "=r" (dumm) : "r" (dumm));
-            dumm >>= (32 - self->bits);
-            //nop here?
-        }
-        data[num_rx] = dumm;
-    }
-
-    if(!spi_wait_flag_unset(self, SSI_SR_BSY, word_timeout)) {
-        *errcode = MP_ETIMEDOUT;
+        *errcode = 0;
         return num_rx;
     }
-
-    *errcode = 0;
-    return num_rx;
 }
 
-mp_uint_t spi_rx_tx(machine_hard_spi_obj_t *self, const uint8_t* data_tx, uint8_t* data_rx, size_t len, uint32_t word_timeout, int *errcode) {
+
+mp_uint_t spi_rx_tx(machine_hard_spi_obj_t *self, const uint16_t* data_tx, uint16_t* data_rx, size_t len, uint32_t word_timeout, int *errcode) {
     uint num_rtx = 0;
     uint32_t dumm;
     volatile uint32_t dat;
-    while(num_rtx < len) {
 
-        if(!spi_rx_wait(self, word_timeout)) {
-            *errcode = MP_ETIMEDOUT;
-            return num_rtx;
-        }
-
-        if(!spi_tx_wait(self, word_timeout)) {
-            *errcode = MP_ETIMEDOUT;
-            return num_rtx;
-        }
-
-        // Reversing bit order of data
-        if(self->lsb_first) {
-            asm volatile("rbit %1,%0" : "=r" (dat) : "r" (data_tx[num_rtx]));
-            dat >>= (32 - self->bits);
-            //nop here?
-            SSIDataPutNonBlocking(self->spi_base, dat);
-        } else {
-            SSIDataPutNonBlocking(self->spi_base, data_tx[num_rtx]);
-        }   
-        SSIDataGetNonBlocking(self->spi_base, &dumm);
-        if(self->lsb_first) {
-            asm volatile("rbit %1,%0" : "=r" (dumm) : "r" (dumm));
-            dumm >>= (32 - self->bits);
-            //nop here?
-        }
-        data_rx[num_rtx] = dumm;
+    /* when dmaa is enabled for receive and transmit */
+    if(self->dma_enabled == (SSI_DMA_TX | SSI_DMA_RX))
+    {
+        spi_dma_rx(self->dma_channel_rx,(uint8_t*) (self->spi_base + SSI_O_DR), data_rx, self->bits,len);
+        spi_dma_tx(self->dma_channel_tx, data_tx,(uint8_t*) (self->spi_base + SSI_O_DR), self->bits,len);
+        return len;
     }
+    else{
+        while(num_rtx < len) {
 
-    if(!spi_wait_flag_unset(self, SSI_SR_BSY, word_timeout)) {
-        *errcode = MP_ETIMEDOUT;
-        return num_rtx;
-    }
+            // if(!spi_rx_wait(self, word_timeout)) {
+                //   *errcode = MP_ETIMEDOUT;
+                // return num_rtx;
+                //}
 
-    *errcode = 0;
-    return num_rtx;
+            /* if(!spi_tx_wait(self, word_timeout)) {
+                    *errcode = MP_ETIMEDOUT;
+                    return num_rtx;
+                }*/
+
+                // Reversing bit order of data
+                if(self->lsb_first) {
+                    asm volatile("rbit %1,%0" : "=r" (dat) : "r" (data_tx[num_rtx]));
+                    dat >>= (32 - self->bits);
+                    //nop here?
+                    SSIDataPutNonBlocking(self->spi_base, dat);
+                } else {
+                    SSIDataPutNonBlocking(self->spi_base, data_tx[num_rtx]);
+                }   
+            int a;
+                for(int i = 0; i<100000; i++)
+                {
+                    a++;
+                }
+                SSIDataGetNonBlocking(self->spi_base, &dumm);
+                if(self->lsb_first) {
+                    asm volatile("rbit %1,%0" : "=r" (dumm) : "r" (dumm));
+                    dumm >>= (32 - self->bits);
+                    //nop here?
+                }
+                data_rx[num_rtx] = dumm;
+                num_rtx++;
+        }
+
+            if(!spi_wait_flag_unset(self, SSI_SR_BSY, word_timeout)) {
+                *errcode = MP_ETIMEDOUT;
+                return num_rtx;
+            }
+
+            *errcode = 0;
+            return num_rtx;
+            }
 }
 
 // A transfer of "len" bytes should take len*8*1000/baudrate milliseconds.
@@ -468,14 +530,14 @@ mp_uint_t spi_rx_tx(machine_hard_spi_obj_t *self, const uint8_t* data_tx, uint8_
 // and use that value for the baudrate in the formula, plus a small constant.
 #define SPI_TRANSFER_TIMEOUT(len) ((len) + 100)
 
-STATIC void spi_transfer(const mp_obj_t *self_in, size_t len, const uint8_t *src, uint8_t *dest, uint32_t timeout) {
+STATIC void spi_transfer(const mp_obj_t *self_in, size_t len, const uint16_t *src, uint16_t *dest, uint32_t timeout) {
     mp_int_t status = 0;
     uint bytes_trans = 0;
     machine_hard_spi_obj_t* self = (machine_hard_spi_obj_t*) self_in;
     
     if (dest == NULL) {
         // send only
-        if (len == 1 || query_irq() == IRQ_STATE_DISABLED) {
+        if (len <= 4 || query_irq() == IRQ_STATE_DISABLED) {
             bytes_trans = spi_tx_only(self, src, len, timeout, &status);
         } else {
             // TODO
@@ -489,7 +551,7 @@ STATIC void spi_transfer(const mp_obj_t *self_in, size_t len, const uint8_t *src
         }
     } else {
         // send and receive
-        if (len == 1 || query_irq() == IRQ_STATE_DISABLED) {
+        if (len <= 16 || query_irq() == IRQ_STATE_DISABLED) {
             bytes_trans = spi_rx_tx(self, src, dest, len, timeout, &status);
         } else {
             // TODO
@@ -569,7 +631,7 @@ STATIC mp_obj_t machine_hard_spi_init_helper(mp_obj_t* self_in, size_t n_args, c
     }
     self->mode = args[ARG_mode].u_int;
 
-    if(args[ARG_bits].u_int >= 16 || args[ARG_bits].u_int <= 4) {
+    if(args[ARG_bits].u_int > 16 || args[ARG_bits].u_int <= 4) {
         nlr_raise(mp_obj_new_exception_msg(&mp_type_ValueError, "invalid word length, only values 4..16 are available"));
     }
     self->bits = args[ARG_bits].u_int;
@@ -688,7 +750,7 @@ STATIC MP_DEFINE_CONST_FUN_OBJ_1(machine_spi_deinit_obj, machine_hard_spi_deinit
     
 // }
 
-STATIC void machine_hard_spi_transfer(mp_obj_base_t *self_in, size_t len, const uint8_t *src, uint8_t *dest) {
+STATIC void machine_hard_spi_transfer(mp_obj_base_t *self_in, size_t len, const uint16_t *src, uint16_t *dest) {
     // machine_hard_spi_obj_t *self = (machine_hard_spi_obj_t*)self_in;
     spi_transfer((mp_obj_t*)self_in, len, src, dest, SPI_TRANSFER_TIMEOUT(len));
 }
@@ -697,7 +759,7 @@ STATIC mp_obj_t mp_machine_hard_spi_read(size_t n_args, const mp_obj_t *args) {
     vstr_t vstr;
     vstr_init_len(&vstr, mp_obj_get_int(args[1]));
     memset(vstr.buf, n_args == 3 ? mp_obj_get_int(args[2]) : 0, vstr.len);
-    machine_hard_spi_transfer(args[0], vstr.len, (uint8_t*)vstr.buf, (uint8_t*)vstr.buf);
+    machine_hard_spi_transfer(args[0], vstr.len, (uint16_t*)vstr.buf, (uint16_t*)vstr.buf);
     return mp_obj_new_str_from_vstr(&mp_type_bytes, &vstr);
 }
 MP_DEFINE_CONST_FUN_OBJ_VAR_BETWEEN(mp_machine_hard_spi_read_obj, 2, 3, mp_machine_hard_spi_read);
@@ -714,7 +776,11 @@ MP_DEFINE_CONST_FUN_OBJ_VAR_BETWEEN(mp_machine_hard_spi_readinto_obj, 2, 3, mp_m
 STATIC mp_obj_t mp_machine_hard_spi_write(mp_obj_t self, mp_obj_t wr_buf) {
     mp_buffer_info_t src;
     mp_get_buffer_raise(wr_buf, &src, MP_BUFFER_READ);
-    machine_hard_spi_transfer(self, src.len, (const uint8_t*)src.buf, NULL);
+    if(src.typecode == 0x48)
+    {
+        src.len = src.len/2;
+    }
+    machine_hard_spi_transfer(self, src.len, (const uint16_t*)src.buf, NULL);
     return mp_const_none;
 }
 MP_DEFINE_CONST_FUN_OBJ_2(mp_machine_hard_spi_write_obj, mp_machine_hard_spi_write);
@@ -727,6 +793,11 @@ STATIC mp_obj_t mp_machine_hard_spi_write_readinto(mp_obj_t self, mp_obj_t wr_bu
     if (src.len != dest.len) {
         mp_raise_ValueError("buffers must be the same length");
     }
+    if(src.typecode == 0x48)
+    {
+        src.len = src.len/2;
+    }
+
     machine_hard_spi_transfer(self, src.len, src.buf, dest.buf);
     return mp_const_none;
 }

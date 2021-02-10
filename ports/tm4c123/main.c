@@ -70,6 +70,7 @@
 //#include "dac.h"
 //#include "can.h"
 //#include "modnetwork.h"
+#include "dma.h"
 
 // prevent clash between driverlib and CMSIS
 #ifdef NVIC_BASE
@@ -474,9 +475,11 @@ soft_reset:
 
     readline_init0();
     pin_init0();
-    //TODO extint_init0();
+    extint_init0();
     //TODO timer_init0();
     uart_init0();
+
+    dma_hw_init();
 
     //TODO Missing Repl Config
 
