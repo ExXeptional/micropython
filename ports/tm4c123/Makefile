@@ -67,7 +67,7 @@ INC += -I$(TOP)
 INC += -I$(BUILD)
 INC += -I$(BUILD)/genhdr
 INC += -I$(TIVAWARE_LIB)
-INC += -I/Users/svenglueck/ti/tivaware_c_series_2_1_4_178/driverlib #$(TIVAWARE_LIB)/driverlib
+INC += -I$(TIVAWARE_LIB)/driverlib
 INC += -I$(PY_SRC)
 INC += -I./board
 INC += -I../../
@@ -142,7 +142,7 @@ LD = $(CC)
 LDFLAGS = -Wl,-nostdlib,-T,$(LINKER_FILE),-Map=$(BUILD)/ld_output.map,--cref,--gc-sections $(CFLAGS)
 
 # Libraries
-LIBS = /Users/svenglueck/ti/tivaware_c_series_2_1_4_178/driverlib/gcc/libdriver.a #$(TIVAWARE_LIB)/driverlib/gcc/libdriver.a
+LIBS = $(TIVAWARE_LIB)/driverlib/gcc/libdriver.a
 LIBGCC := ${shell $(CC) $(CFLAGS) --print-libgcc-file-name}
 LIBC := ${shell ${CC} ${CFLAGS} --print-file-name=libc.a}
 LIBM := ${shell ${CC} ${CFLAGS} --print-file-name=libm.a}
@@ -339,7 +339,7 @@ $(BUILD)/firmware.axf: $(OBJ)
 	$(ECHO) Used these C-Flags: $(CFLAGS) 
 	$(ECHO)
 	$(ECHO) Making driverlib
-	$(Q)$(MAKE) -C /Users/svenglueck/ti/tivaware_c_series_2_1_4_178/driverlib/ #${TIVAWARE_LIB}/driverlib/
+	$(Q)$(MAKE) -C ${TIVAWARE_LIB}/driverlib/
 	$(ECHO)
 	$(ECHO) Linking...
 	$(ECHO) " >" $(BUILD)/firmware.axf
