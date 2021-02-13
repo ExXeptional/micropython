@@ -134,10 +134,10 @@ uint extint_register(extint_obj_t *self_in, mp_obj_t pin_obj, uint32_t mode, uin
         // get both the port number and line number.
         line = mp_obj_get_int(pin_obj);
         if (line < 16) {
-            nlr_raise(mp_obj_new_exception_msg_varg(&mp_type_ValueError, "ExtInt vector %d < 16, use a Pin object", line));
+            nlr_raise(mp_obj_new_exception_msg_varg(&mp_type_ValueError, MP_ERROR_TEXT("ExtInt vector %d < 16, use a Pin object"), line));
         }
         if (line >= EXTI_NUM_VECTORS) {
-            nlr_raise(mp_obj_new_exception_msg_varg(&mp_type_ValueError, "ExtInt vector %d >= max of %d", line, EXTI_NUM_VECTORS));
+            nlr_raise(mp_obj_new_exception_msg_varg(&mp_type_ValueError, MP_ERROR_TEXT("ExtInt vector %d >= max of %d"), line, EXTI_NUM_VECTORS));
         }
     } else {
         pin = pin_find(pin_obj);
@@ -148,7 +148,7 @@ uint extint_register(extint_obj_t *self_in, mp_obj_t pin_obj, uint32_t mode, uin
         mode != GPIO_FALLING_EDGE &&
         mode != GPIO_BOTH_EDGES) 
         {
-        nlr_raise(mp_obj_new_exception_msg_varg(&mp_type_ValueError, "invalid ExtInt Mode: %d", mode));
+        nlr_raise(mp_obj_new_exception_msg_varg(&mp_type_ValueError, MP_ERROR_TEXT("invalid ExtInt Mode: %d"), mode));
     }
     self_in->gpio = pin->gpio;
     self_in->pin_mask = pin->pin_mask;
@@ -169,7 +169,7 @@ uint extint_register(extint_obj_t *self_in, mp_obj_t pin_obj, uint32_t mode, uin
     mp_obj_t *cb = &MP_STATE_PORT(pyb_extint_callback)[line];
     if (*cb != mp_const_none && /*MP_OBJ_FROM_PTR(pin)*/ callback_obj != *cb/*pyb_extint_callback_arg[line]*/) {
         nlr_raise(mp_obj_new_exception_msg_varg(&mp_type_ValueError,
-            "There is already an interrupt handler for Port %c in use", text[line]));
+            MP_ERROR_TEXT("There is already an interrupt handler for Port %c in use"), text[line]));
     }
     /*if (!override_callback_obj && *cb != mp_const_none && callback_obj != mp_const_none) {
         nlr_raise(mp_obj_new_exception_msg_varg(&mp_type_ValueError, "ExtInt vector %d is already in use", v_line));
@@ -236,7 +236,7 @@ void extint_register_pin(const pin_obj_t *pin, uint32_t mode, bool hard_irq, mp_
         //printf("tesing");
        //if (MP_OBJ_IS_SMALL_INT(pyb_extint_callback_arg[line])) {
             nlr_raise(mp_obj_new_exception_msg_varg(&mp_type_ValueError,
-               "There is already an interrupt handler for Port %c in use", text[line]));
+               MP_ERROR_TEXT("There is already an interrupt handler for Port %c in use"), text[line]));
        /* } else {
             const pin_obj_t *other_pin = (const pin_obj_t*)pyb_extint_callback_arg[line];
             nlr_raise(mp_obj_new_exception_msg_varg(&mp_type_ValueError,
