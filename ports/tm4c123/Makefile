@@ -14,13 +14,9 @@ DEBUG ?= 1
 LINK_TIME_OPT = 1
 
 # Location of the TivaWare library
-# Can be pointed to a newer version if desired
-TIVAWARE_LIB = /Users/svenglueck/ti/tivaware_c_series_2_1_4_178 #/mnt/c/ti/TivaWare
-#TIVAWARE_LIB = /home/raphael/ti/tivaware
+TIVAWARE_LIB ?= tivaware
 
-# Name of the Project (and the resulting binary file)
-PROJECT_NAME = uPY_TM4C123
-
+## NOT YET IMPLEMENTED, USE LMFLASHER 
 # OpenOCD paths
 #OPENOCD_PATH = /usr/local/share/openocd
 OPENOCD_PATH = openocd
@@ -48,6 +44,9 @@ MICROPY_FLOAT_IMPL=single
 
 # Implementation of arbitrary long integers
 LONGINT_IMPL=mpz
+
+# MicroPython feature configurations
+MICROPY_ROM_TEXT_COMPRESSION ?= 1
 
 # include py core make definitions
 include $(TOP)/py/py.mk
@@ -86,7 +85,7 @@ FATFS_DIR=lib/oofatfs
 CFLAGS_CORTEX_M4 = -mthumb -mtune=cortex-m4 -mcpu=cortex-m4 -mfpu=fpv4-sp-d16 -mfloat-abi=hard -mabi=aapcs-linux
 
 # Warnings
-CFLAGS = -Wall -Werror -Wpointer-arith
+CFLAGS = -Wall -Werror -Wpointer-arith -Wno-missing-attributes
 
 # Misc flags
 CFLAGS += $(INC) -std=gnu99 -nostdlib $(CFLAGS_CORTEX_M4) $(COPT) -fshort-enums -fdata-sections -ffunction-sections 
@@ -124,7 +123,8 @@ ifeq ($(DEBUG), 1)
 CFLAGS += -ggdb -DDEBUG -DPENDSV_DEBUG
 COPT += -Og
 else
-COPT += -Os -DNDEBUG
+CFLAGS += -DNDEBUG
+COPT += -Os
 # Flags for Link Time Optimization
 ifeq ($(LINK_TIME_OPT), 1)
 CFLAGS += -flto -fuse-linker-plugin
@@ -135,11 +135,11 @@ endif
 # Linker                                               #
 ########################################################
 
-LINKER_FILE = tm4c123gh6pm.ld
+LINKER_FILE = board/tm4c123gh6pm.ld
 
 # use gcc as linker frontend for additional funtionality
 LD = $(CC)
-LDFLAGS = -Wl,-nostdlib,-T,$(LINKER_FILE),-Map=$(@:.axf=.map),--cref,--gc-sections $(CFLAGS)
+LDFLAGS = -Wl,-nostdlib,-T,$(LINKER_FILE),-Map=$(BUILD)/ld_output.map,--cref,--gc-sections $(CFLAGS)
 
 # Libraries
 LIBS = /Users/svenglueck/ti/tivaware_c_series_2_1_4_178/driverlib/gcc/libdriver.a #$(TIVAWARE_LIB)/driverlib/gcc/libdriver.a
@@ -160,8 +160,8 @@ CPFLAGS = -O binary
 # Sources	
 ########################################################
 
-STARTUP_FILE = startup_TM4C123.c
-SYSTEM_FILE = misc/system_TM4C123.c
+STARTUP_FILE = board/startup_TM4C123.c
+SYSTEM_FILE = board/system_TM4C123.c
 
 # lib
 SRC_LIB = $(addprefix lib/,\
@@ -173,16 +173,15 @@ SRC_LIB = $(addprefix lib/,\
 	utils/pyexec.c \
 	utils/sys_stdio_mphal.c \
 	oofatfs/ff.c \
-	oofatfs/option/unicode.c \
+	oofatfs/ffunicode.c \
 	)
 
 # Module sources
-MODS_SRC_C = $(addprefix mods/,\
+SRC_MOD = $(addprefix mods/,\
 	mphalport.c \
 	pin.c \
 	pin_named_pins.c \
 	modmachine.c \
-	modpyb.c \
 	uart.c \
 	rtc.c \
 	systick.c \
@@ -190,6 +189,7 @@ MODS_SRC_C = $(addprefix mods/,\
 	spi.c \
 	sdcard.c \
 	moduos.c \
+	fatfs_port.c \
 	pendsv.c \
 	pybthread.c \
 	modutime.c \
@@ -198,30 +198,23 @@ MODS_SRC_C = $(addprefix mods/,\
 	dma.c \
 	extint.c \
 )
-	# fatfs_port.c \
-	# irq.c \
-	# modutime.c \	
-	# moduos.c \
-	# pybthread.c \
+
+	# modpyb.c \
 	# pendsv.c \
 	# flashbdev.c \
 	# storage.c \
 	# flash.c \
 	# )
-	#	extint.c see forum
-
-# QSTR sources
-SRC_QSTR += $(MODS_SRC_C)
 
 # Core sources
-CORE_SRC_C = \
+SRC_CORE = \
 	$(STARTUP_FILE) \
 	main.c \
 	uart_core.c \
 	gccollect.c \
 	$(SYSTEM_FILE) \
 	
-ASM_SRC_S = \
+SRC_ASM = \
 	gchelper.s 
 
 # LIBM
@@ -233,12 +226,12 @@ SRC_LIBF = $(addprefix lib/libm/, math.c thumb_vfp_sqrtf.c acoshf.c asinfacosf.c
 endif
 
 # Additional sources
-# ADD_SRC_C = 
+# SRC_ADD = 
 # 	drivers/bus/softspi.c 
 		
-SRC_C = $(CORE_SRC_C) $(MODS_SRC_C) $(SRC_LIB) $(SRC_LIBF) $(ADD_SRC_C) $(GEN_PINS_SRC)
+SRC_C = $(SRC_CORE) $(SRC_MOD) $(SRC_LIB) $(SRC_LIBF) $(SRC_ADD) $(GEN_PINS_SRC)
 
-ASM_OBJ = $(addprefix $(BUILD)/, $(ASM_SRC_S:.s=.o))
+ASM_OBJ = $(addprefix $(BUILD)/, $(SRC_ASM:.s=.o))
 
 C_OBJ = $(addprefix $(BUILD)/, $(SRC_C:.c=.o))# $(BUILD)/board/pins.o
 
@@ -292,7 +285,7 @@ GEN_CDCINF_FILE = $(HEADER_BUILD)/pybcdc.inf
 GEN_CDCINF_HEADER = $(HEADER_BUILD)/pybcdc_inf.h
 
 # List of sources for qstr extraction
-SRC_QSTR += $(SRC_C) $(SRC_MOD) $(SRC_LIB) $(EXTMOD_SRC_C) $(GEN_PINS_SRC)
+SRC_QSTR += $(SRC_C)
 # Append any auto-generated sources that are needed by sources listed in
 # SRC_QSTR
 SRC_QSTR_AUTO_DEPS += $(GEN_CDCINF_HEADER)
@@ -341,7 +334,7 @@ $(GEN_CDCINF_FILE): $(CDCINF_TEMPLATE) $(INSERT_USB_IDS) $(USB_IDS_FILE) | $(HEA
 ########################################################
 
 # Build axf and elf
-${PROJECT_NAME}.axf: $(OBJ)
+$(BUILD)/firmware.axf: $(OBJ)
 	$(ECHO)
 	$(ECHO) Used these C-Flags: $(CFLAGS) 
 	$(ECHO)
@@ -349,30 +342,33 @@ ${PROJECT_NAME}.axf: $(OBJ)
 	$(Q)$(MAKE) -C /Users/svenglueck/ti/tivaware_c_series_2_1_4_178/driverlib/ #${TIVAWARE_LIB}/driverlib/
 	$(ECHO)
 	$(ECHO) Linking...
-	$(ECHO) " >" ${PROJECT_NAME}.axf
-	$(Q)$(LD) $(LDFLAGS) -o ${PROJECT_NAME}.axf $(OBJ) $(LIBS) $(LIBM) $(LIBC) $(LIBGCC)
-	$(ECHO) " >" ${PROJECT_NAME}.elf
-	$(Q)$(LD) $(LDFLAGS) -o ${PROJECT_NAME}.elf $(OBJ) $(LIBS) $(LIBM) $(LIBC) $(LIBGCC)
+	$(ECHO) " >" $(BUILD)/firmware.axf
+	$(Q)$(LD) $(LDFLAGS) -o $(BUILD)/firmware.axf $(OBJ) $(LIBS) $(LIBM) $(LIBC) $(LIBGCC)
+	# $(ECHO) " >" $(BUILD)/firmware.elf
+	# $(Q)$(LD) $(LDFLAGS) -o $(BUILD)/firmware.elf $(OBJ) $(LIBS) $(LIBM) $(LIBC) $(LIBGCC)
 
-# Build binary
-${PROJECT_NAME}: ${PROJECT_NAME}.axf
+# Extract pure binary from firmware
+$(BUILD)/firmware.bin: $(BUILD)/firmware.axf
 	$(ECHO)
 	$(ECHO) -n Copying...
-	$(Q)$(OBJCOPY) $(CPFLAGS) ${PROJECT_NAME}.axf ${PROJECT_NAME}.bin
-	$(ECHO) " >" ${PROJECT_NAME}.bin
-	$(ECHO) -n Creating list file...
-	$(Q)$(OD) $(ODFLAGS) ${PROJECT_NAME}.axf > ${PROJECT_NAME}.lst
-	$(ECHO) " >" ${PROJECT_NAME}.lst
+	$(Q)$(OBJCOPY) $(CPFLAGS) $(BUILD)/firmware.axf $(BUILD)/firmware.bin
+	$(ECHO) " >" $(BUILD)/firmware.bin
 	$(ECHO)
 
-.PHONY: info
-info:
+list: $(BUILD)/firmware.axf
+	$(ECHO)
+	$(ECHO) -n Creating list file...
+	$(Q)$(OD) $(ODFLAGS) $(BUILD)/firmware.axf > $(BUILD)/firmware.lst
+	$(ECHO) " >" $(BUILD)/firmware.lst
+	$(ECHO)
+
+info: $(BUILD)/firmware.bin
 	$(ECHO) +---------------------------------------------------
 	$(ECHO) + Info
 	$(ECHO) +---------------------------------------------------
 	$(ECHO) + DEBUG = $(DEBUG)
 	$(ECHO) +---------------------------------------------------
-	$(ECHO) + Size = $$(( $(word 7, $(shell $(CROSS_COMPILE)size -Bd $(PROJECT_NAME).axf)) + $(word 8, $(shell $(CROSS_COMPILE)size -Bd $(PROJECT_NAME).axf)) )) kiB
+	-$(ECHO) + Size = $(shell stat -c %s $(BUILD)/firmware.bin) kiB
 	$(ECHO) +---------------------------------------------------
 	$(ECHO) + OPT-Flags: $(COPT)
 	$(ECHO) +---------------------------------------------------
@@ -381,7 +377,7 @@ info:
 new: clean all
 
 .PHONY: all
-all: $(OBJ) ${PROJECT_NAME}.axf ${PROJECT_NAME} info
+all: $(BUILD)/firmware.bin info
 
 ########################################################
 # Cleanup
@@ -391,4 +387,3 @@ all: $(OBJ) ${PROJECT_NAME}.axf ${PROJECT_NAME} info
 CLEAN_EXTRA += *.axf *.bin *.lst *.elf *.map #$(TIVAWARE_LIB)/driverlib/gcc/* 
 
 include $(TOP)/py/mkrules.mk
-

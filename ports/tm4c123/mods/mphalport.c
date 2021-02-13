@@ -110,7 +110,7 @@ bool mp_hal_pin_config(mp_hal_pin_obj_t pin_obj, uint32_t dir, uint32_t type, ui
     mp_hal_gpio_clock_enable(pin_obj->periph);
 
     if(mp_hal_pin_needs_unlocking(pin_obj)) {
-        nlr_raise(mp_obj_new_exception_msg_varg(&mp_type_RuntimeError, "Pin \"%s\" needs to be unlocked first", qstr_str(pin_obj->name)));
+        nlr_raise(mp_obj_new_exception_msg_varg(&mp_type_RuntimeError, MP_ERROR_TEXT("Pin \"%s\" needs to be unlocked first"), qstr_str(pin_obj->name)));
         return false;
     }
 

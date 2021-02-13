@@ -1,3 +1,0 @@
-Refactoring Notes:
-
-- MICROPY_MIN_USE_STM32_MCU def in myconfigport.h: Umbenennen in MICROPY_MIN_USE_TM4C_MCU

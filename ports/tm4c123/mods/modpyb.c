@@ -125,7 +125,7 @@ STATIC mp_obj_t pyb_repl_uart(size_t n_args, const mp_obj_t *args) {
             MP_STATE_PORT(machine_stdio_uart) = args[0];
             uart_attach_to_repl(MP_STATE_PORT(machine_stdio_uart), true);
         } else {
-            mp_raise_ValueError("need a UART object");
+            mp_raise_ValueError(MP_ERROR_TEXT("need a UART object"));
         }
         return mp_const_none;
     }

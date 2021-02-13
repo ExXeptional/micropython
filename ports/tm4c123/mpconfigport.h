@@ -92,7 +92,7 @@
 
 // fatfs configuration used in ffconf.h
 #define MICROPY_FATFS_ENABLE_LFN       (1)
-#define MICROPY_FATFS_LFN_CODE_PAGE    (437) /* 1=SFN/ANSI 437=LFN/U.S.(OEM) */
+#define MICROPY_FATFS_LFN_CODE_PAGE    437 /* 1=SFN/ANSI 437=LFN/U.S.(OEM) */
 #define MICROPY_FATFS_USE_LABEL        (1)
 #define MICROPY_FATFS_RPATH            (2)
 #define MICROPY_FATFS_MULTI_PARTITION  (1)
@@ -148,8 +148,8 @@ static inline mp_uint_t disable_irq(void) {
 #if MICROPY_PY_THREAD
 #define MICROPY_EVENT_POLL_HOOK \
     do { \
-        extern void mp_handle_pending(void); \
-        mp_handle_pending(); \
+        extern void mp_handle_pending(bool); \
+        mp_handle_pending(true); \
         if (pyb_thread_enabled) { \
             MP_THREAD_GIL_EXIT(); \
             pyb_thread_yield(); \
@@ -163,8 +163,8 @@ static inline mp_uint_t disable_irq(void) {
 #else
 #define MICROPY_EVENT_POLL_HOOK \
     do { \
-        extern void mp_handle_pending(void); \
-        mp_handle_pending(); \
+        extern void mp_handle_pending(bool); \
+        mp_handle_pending(true); \
         __WFI(); \
     } while (0);
 
@@ -172,7 +172,6 @@ static inline mp_uint_t disable_irq(void) {
 #endif
 
 extern const struct _mp_obj_module_t machine_module;
-extern const struct _mp_obj_module_t pyb_module;
 extern const struct _mp_obj_module_t mp_module_uos;
 //extern const struct _mp_obj_module_t pin_module;
 
@@ -199,9 +198,8 @@ extern const struct _mp_obj_module_t mp_module_uos;
 #endif
 
 #define MICROPY_PORT_BUILTIN_MODULES \
-        { MP_ROM_QSTR(MP_QSTR_umachine), MP_ROM_PTR(&machine_module) }, \
-        { MP_ROM_QSTR(MP_QSTR_pyb), MP_ROM_PTR(&pyb_module) }, \
-       { MP_ROM_QSTR(MP_QSTR_uos), MP_ROM_PTR(&mp_module_uos) }, 
+    { MP_ROM_QSTR(MP_QSTR_umachine), MP_ROM_PTR(&machine_module) }, \
+    { MP_ROM_QSTR(MP_QSTR_uos), MP_ROM_PTR(&mp_module_uos) }, 
 
 #define MICROPY_PORT_CONSTANTS \
     { MP_ROM_QSTR(MP_QSTR_umachine), MP_ROM_PTR(&machine_module) }, \
@@ -232,3 +230,4 @@ extern const struct _mp_obj_module_t mp_module_uos;
     struct _machine_uart_obj_t *machine_uart_obj_all[MICROPY_HW_MAX_UART]; \
     struct _machine_hard_spi_obj_t *machine_spi_obj_all[MICROPY_HW_MAX_SPI];\
 
+//EOF

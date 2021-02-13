@@ -598,7 +598,7 @@ mp_obj_t pyb_rtc_wakeup(size_t n_args, const mp_obj_t *args) {
             callback = args[2];
         }
     } else {
-        mp_raise_TypeError("This function only accepts 0 to 2 arguments");
+        mp_raise_TypeError(MP_ERROR_TEXT("This function only accepts 0 to 2 arguments"));
     }
 
     // set the callback
@@ -627,10 +627,10 @@ mp_obj_t pyb_rtc_calibration(size_t n_args, const mp_obj_t *args) {
         if (cal < 0xFFFF || cal > 0x0000) {
             ROM_HibernateRTCTrimSet(cal);
         } else {
-            mp_raise_ValueError("calibration value out of range");
+            mp_raise_ValueError(MP_ERROR_TEXT("calibration value out of range"));
         }
     } else {
-        mp_raise_TypeError("Wrong number of arguments");
+        mp_raise_TypeError(MP_ERROR_TEXT("Wrong number of arguments"));
     }
     return mp_obj_new_int(cal);
 }

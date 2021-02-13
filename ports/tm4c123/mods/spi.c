@@ -147,16 +147,14 @@ STATIC int spi_find(mp_obj_t id) {
             return SPI_3;
         #endif
         }
-        nlr_raise(mp_obj_new_exception_msg_varg(&mp_type_ValueError,
-            "SPI(%s) doesn't exist", port));
+        nlr_raise(mp_obj_new_exception_msg_varg(&mp_type_ValueError, MP_ERROR_TEXT("SPI(%s) doesn't exist"), port));
     } else {
         // given an integer id
         int spi_id = mp_obj_get_int(id);
         if (spi_id >= 0 && spi_id <= MP_ARRAY_SIZE(MP_STATE_PORT(machine_spi_obj_all))) {
             return spi_id;
         }
-        nlr_raise(mp_obj_new_exception_msg_varg(&mp_type_ValueError,
-            "SPI(%d) doesn't exist", spi_id));
+        nlr_raise(mp_obj_new_exception_msg_varg(&mp_type_ValueError, MP_ERROR_TEXT("SPI(%d) doesn't exist"), spi_id));
     }
 }
 
@@ -622,22 +620,22 @@ STATIC mp_obj_t machine_hard_spi_init_helper(mp_obj_t* self_in, size_t n_args, c
     if (args[ARG_sck].u_obj != MP_OBJ_NULL
         || args[ARG_mosi].u_obj != MP_OBJ_NULL
         || args[ARG_miso].u_obj != MP_OBJ_NULL) {
-        nlr_raise(mp_obj_new_exception_msg(&mp_type_ValueError,"explicit choice of sck/mosi/miso is not implemented"));
+        nlr_raise(mp_obj_new_exception_msg(&mp_type_ValueError, MP_ERROR_TEXT("explicit choice of sck/mosi/miso is not implemented")));
     }
 
     // set the SPI configuration values
     if(args[ARG_mode].u_int > 2) {
-        nlr_raise(mp_obj_new_exception_msg(&mp_type_ValueError, "Mode accepts only MASTER or SLAVE"));
+        nlr_raise(mp_obj_new_exception_msg(&mp_type_ValueError, MP_ERROR_TEXT("Mode accepts only MASTER or SLAVE")));
     }
     self->mode = args[ARG_mode].u_int;
-
-    if(args[ARG_bits].u_int > 16 || args[ARG_bits].u_int <= 4) {
-        nlr_raise(mp_obj_new_exception_msg(&mp_type_ValueError, "invalid word length, only values 4..16 are available"));
+  
+    if(args[ARG_bits].u_int >= 16 || args[ARG_bits].u_int <= 4) {
+        nlr_raise(mp_obj_new_exception_msg(&mp_type_ValueError, MP_ERROR_TEXT("invalid word length, only values 4..16 are available")));
     }
     self->bits = args[ARG_bits].u_int;
 
     // if(args[ARG_prescaler].u_int & 0xFFFFFF00) {
-    //     nlr_raise(mp_obj_new_exception_msg_varg(&mp_type_ValueError, "prescaler only 2-254!"));
+    //     mp_raise_ValueError( "prescaler only 2-254!"));
     // }
     // uint8_t prescale = args[ARG_prescaler].u_int;
 
@@ -645,11 +643,11 @@ STATIC mp_obj_t machine_hard_spi_init_helper(mp_obj_t* self_in, size_t n_args, c
 
     if(!self->mode) {
         if(args[ARG_baudrate].u_int >= 25000000) {
-            nlr_raise(mp_obj_new_exception_msg(&mp_type_ValueError, "baudrate too high, max 25 Mbaud as master"));
+            nlr_raise(mp_obj_new_exception_msg(&mp_type_ValueError, MP_ERROR_TEXT("baudrate too high, max 25 Mbaud as master")));
         }
     } else {
         if(args[ARG_baudrate].u_int >= 6666666) {
-            nlr_raise(mp_obj_new_exception_msg(&mp_type_ValueError, "baudrate too high, max 6.66 mBaud as slave"));
+            nlr_raise(mp_obj_new_exception_msg(&mp_type_ValueError, MP_ERROR_TEXT("baudrate too high, max 6.66 Mbaud as slave")));
         }
     }
     self->baudrate = args[ARG_baudrate].u_int;
@@ -660,16 +658,16 @@ STATIC mp_obj_t machine_hard_spi_init_helper(mp_obj_t* self_in, size_t n_args, c
 
     // support both polarity/phase and protocol but only one at a time, protocol takes priority
     if(polarity < 0  || polarity > 1) {
-        nlr_raise(mp_obj_new_exception_msg(&mp_type_ValueError, "polarity not correct; IDLE_LOW or IDLE_HIGH"));
+        nlr_raise(mp_obj_new_exception_msg(&mp_type_ValueError, MP_ERROR_TEXT("polarity not correct; IDLE_LOW or IDLE_HIGH")));
     }
     if(phase < 0 || phase > 1) {
-        nlr_raise(mp_obj_new_exception_msg(&mp_type_ValueError, "phase not correct; FIRST_EDGE or SECOND_EDGE"));
+        nlr_raise(mp_obj_new_exception_msg(&mp_type_ValueError, MP_ERROR_TEXT("phase not correct; FIRST_EDGE or SECOND_EDGE")));
     }
     if(protocol != -1){
         if(!(protocol == SSI_FRF_MOTO_MODE_0 || protocol == SSI_FRF_MOTO_MODE_1  ||
             protocol == SSI_FRF_MOTO_MODE_2 || protocol == SSI_FRF_MOTO_MODE_3  ||
             protocol == SSI_FRF_TI || protocol == SSI_FRF_NMW)) {
-            nlr_raise(mp_obj_new_exception_msg(&mp_type_ValueError, "protocol not supported, please use SPI0..3, TI or MICROWIRE!"));
+            nlr_raise(mp_obj_new_exception_msg(&mp_type_ValueError, MP_ERROR_TEXT("protocol not supported, please use SPI0..3, TI or MICROWIRE!")));
         }
         self->protocol = protocol;
     } else {
@@ -687,7 +685,7 @@ STATIC mp_obj_t machine_hard_spi_init_helper(mp_obj_t* self_in, size_t n_args, c
     }
 
     if(!(args[ARG_dma].u_int <= 3 && args[ARG_dma].u_int >= 0)) {
-        nlr_raise(mp_obj_new_exception_msg(&mp_type_ValueError, "dma accepts only DMA_NONE(0), DMA_RX(1), DMA_TX(2) or DMA_BOTH(3)"));
+        nlr_raise(mp_obj_new_exception_msg(&mp_type_ValueError, MP_ERROR_TEXT("dma accepts only DMA_NONE(0), DMA_RX(1), DMA_TX(2) or DMA_BOTH(3)")));
     }
     self->dma_enabled = args[ARG_dma].u_int;
     
@@ -791,7 +789,7 @@ STATIC mp_obj_t mp_machine_hard_spi_write_readinto(mp_obj_t self, mp_obj_t wr_bu
     mp_buffer_info_t dest;
     mp_get_buffer_raise(rd_buf, &dest, MP_BUFFER_WRITE);
     if (src.len != dest.len) {
-        mp_raise_ValueError("buffers must be the same length");
+        mp_raise_ValueError(MP_ERROR_TEXT("buffers must be the same length"));
     }
     if(src.typecode == 0x48)
     {

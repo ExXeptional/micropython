@@ -660,7 +660,7 @@ STATIC mp_obj_t machine_uart_init_helper(machine_uart_obj_t *self, size_t n_args
 //        config |= UART_CONFIG_WLEN_8;
 //        UART9BitEnable(self->uart);
     } else {
-        mp_raise_ValueError("unsupported combination of bits and parity");
+        mp_raise_ValueError(MP_ERROR_TEXT("unsupported combination of bits and parity"));
     }
 
     self->char_mask = ~(0xFF << self->char_width);
@@ -683,7 +683,7 @@ STATIC mp_obj_t machine_uart_init_helper(machine_uart_obj_t *self, size_t n_args
     // init UART (if it fails, it's because the port doesn't exist)
     // enables Periph clock
     if (!uart_init2(self)) {
-        nlr_raise(mp_obj_new_exception_msg_varg(&mp_type_RuntimeError, "UART(%d) init failed!", self->uart_id));
+        nlr_raise(mp_obj_new_exception_msg_varg(&mp_type_RuntimeError, MP_ERROR_TEXT("UART(%d) init failed!"), self->uart_id));
     }
 
     MAP_UARTDisable(self->uart);
@@ -754,7 +754,7 @@ STATIC mp_obj_t machine_uart_init_helper(machine_uart_obj_t *self, size_t n_args
         baudrate_diff = req_baudrate - actual_baudrate;
     }
     if (20 * baudrate_diff > req_baudrate) {
-        nlr_raise(mp_obj_new_exception_msg_varg(&mp_type_ValueError, "set baudrate %d is not within 5%% of desired value", actual_baudrate));
+        nlr_raise(mp_obj_new_exception_msg_varg(&mp_type_ValueError, MP_ERROR_TEXT("set baudrate %d is not within 5%% of desired value"), actual_baudrate));
     }
 
     MAP_UARTEnable(self->uart);
@@ -797,12 +797,12 @@ STATIC mp_obj_t machine_uart_make_new(const mp_obj_type_t *type, size_t n_args, 
             uart_id = UART_6;
         #endif
         } else {
-            nlr_raise(mp_obj_new_exception_msg_varg(&mp_type_ValueError, "UART(%s) doesn't exist", port));
+            nlr_raise(mp_obj_new_exception_msg_varg(&mp_type_ValueError, MP_ERROR_TEXT("UART(%s) doesn't exist"), port));
         }
     } else {
         uart_id = mp_obj_get_int(args[0]);
         if (!uart_exists(uart_id)) {
-            nlr_raise(mp_obj_new_exception_msg_varg(&mp_type_ValueError, "UART(%d) doesn't exist", uart_id));
+            nlr_raise(mp_obj_new_exception_msg_varg(&mp_type_ValueError, MP_ERROR_TEXT("UART(%d) doesn't exist"), uart_id));
         }
     }
 
